@@ -1,3 +1,4 @@
+GPS_SERIAL_PORT = None # TODO: replace to /dev/ttyUSB0
 
 class IOPins:
     PIN_CRASHING_BUTTON = 1

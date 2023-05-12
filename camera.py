@@ -1,32 +1,36 @@
 import cv2 as cv
 from time import sleep
 from logger import Logger
-from picamerax import PiCamera
 from threading import Event, Thread
 from numpy import zeros, int8 as INT8
-from picamerax.array import PiRGBArray
+
+IS_RPI = False
+if IS_RPI:
+    from picamerax import PiCamera
+    from picamerax.array import PiRGBArray
+
+
+class VideoBuffer:
+    def __init__(self, shape=(480, 640, 3), max_frame_count=0, fill=False) -> None:
+        self.max_frame_count = max_frame_count
+        self.__data = [zeros(shape=shape, dtype=INT8) * max_frame_count] if fill else []
+
+    @property
+    def occupied_size(self):
+        return len(self.__data)
+
+    def pop(self):
+        pass
+
+    def push(self, frame):
+        # Ensure a slot of frame in video buffer
+        if self.occupied_size >= self.max_frame_count:
+            del self.__data[0]  # Remove the 1st frame from video buffer
+        # Append frame to the end of data
+        self.__data.append(frame)
 
 
 class Camera:
-
-    class VideoBuffer:
-        def __init__(self, shape=(480, 640, 3), max_frame_count=0, fill=False) -> None:
-            self.max_frame_count = max_frame_count
-            self.__data = [zeros(shape=shape, dtype=INT8) * max_frame_count] if fill else []
-
-        @property
-        def occupied_size(self):
-            return len(self.__data)
-
-        def pop(self):
-            pass
-
-        def push(self, frame):
-            # Ensure a slot of frame in video buffer
-            if self.occupied_size >= self.max_frame_count:
-                del self.__data[0]  # Remove the 1st frame from video buffer
-            # Append frame to the end of data
-            self.__data.append(frame)
 
     def __init__(self, resolution=(640, 480), framerate=15, vflip=True) -> None:
         # Camera params
@@ -35,17 +39,19 @@ class Camera:
         self.resolution = resolution
         # Camera runtime
         self.VIDEO_DURATION = 5
-        self.picamera = PiCamera()
-        self.picamera.vflip = self.vflip
-        self.picamera.framerate = self.framerate
-        self.picamera.resolution = self.resolution
         # Global runtime
         self.switcher = Event()
         self.logger = Logger("Camera")
         self.DURATION_FRAMES_COUNT = self.framerate * self.VIDEO_DURATION
-        self.video_buffer = Camera.VideoBuffer(self.DURATION_FRAMES_COUNT)
+        self.video_buffer = VideoBuffer(self.DURATION_FRAMES_COUNT)
         # Log
         self.logger.success("Setup complete. Camera Ready...")
+
+    def setup(self):
+        self.picamera = PiCamera()
+        self.picamera.vflip = self.vflip
+        self.picamera.framerate = self.framerate
+        self.picamera.resolution = self.resolution
 
     def start(self):
         self.switcher.set()
@@ -73,7 +79,7 @@ class Camera:
         fourcc = cv.VideoWriter_fourcc(*'mp4v')
         with cv.VideoWriter("crash.mp4", fourcc, self.framerate, self.resolution) as writer:
             for frame in range(self.DURATION_FRAMES_COUNT):
-                writer.write(frame) # Write frame to video file
+                writer.write(frame)  # Write frame to video file.
         # Return the video filename
         return f"{timestamp}.mp4"
 

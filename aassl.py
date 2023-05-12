@@ -1,7 +1,8 @@
 from time import time as current_time
 
 from logger import Logger
-from gps import GPS, Coordinates
+from camera import Camera
+from gps import GPS
 from car import Car, CarInfo, CrashDetectorCallback
 from accident_reporter import AccidentReporter, Accident
 
@@ -19,7 +20,7 @@ class AASSL(CrashDetectorCallback):
         self.accident_reporter = AccidentReporter()
 
         # Camera
-        self.camera = None
+        self.camera = Camera()
         if self.camera is None:
             self.logger.error("No camera was detected.")
 
@@ -28,29 +29,25 @@ class AASSL(CrashDetectorCallback):
         if self.gps is None:
             self.logger.error("No GPS module was detected.")
 
-        # GSM
-        self.gsm = None
-        if self.gsm is None:
-            self.logger.error("No GSM module was detected.")
-
         self.logger.info("System is ready to start...")
 
     def setup_system(self):
-        # Setup car
         self.car.setup()
-
-        # Setup AccidentReporter
+        self.gps.setup()
+        # self.camera.setup()
         self.accident_reporter.setup()
 
-        # Setup GPS
-
-        # Setup Camera
-
     def start_system(self):
-        pass
+        # Start system components
+        self.car.start()
+        self.gps.start()
+        # self.camera.start()
 
     def stop_system(self):
         # Stop system components
+        self.car.stop()
+        self.gps.stop()
+        # self.camera.stop()
         # Exit
         exit(0)
 
@@ -60,8 +57,8 @@ class AASSL(CrashDetectorCallback):
         filename = f"{timestamp}.mp4"
         location = self.gps.last_known_location
         accident_payload = Accident(
-            lat=location.lat,
-            lng=location.lng,
+            lat=location[0],
+            lng=location[1],
             timestamp=timestamp,
             video_filename=filename
         ).as_dict(self.car)
@@ -69,5 +66,6 @@ class AASSL(CrashDetectorCallback):
 
 if __name__ == '__main__':
     aassl = AASSL()
+    aassl.setup_system()
     aassl.start_system()
     aassl.stop_system()

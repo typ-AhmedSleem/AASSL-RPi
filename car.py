@@ -1,10 +1,11 @@
-from time import sleep
 from utils import gpio
-from data import CarKeys
 from logger import Logger
+from constants import IOPins
+from accident_reporter import CarKeys
+
+from time import sleep
 from json import dumps as to_json
 from threading import Thread, Event
-from constants import CarConstants, IOPins
 
 
 class CarInfo:
@@ -22,7 +23,12 @@ class CarInfo:
 
     @staticmethod
     def get_default():
-        return CarConstants.DEFAULT_CAR_INFO
+        return CarInfo(
+            id='',
+            model='',
+            owner='',
+            emergency=''
+        )
 
 
 class CrashDetectorCallback:
@@ -48,8 +54,17 @@ class CrashDetector:
 
     def stop(self):
         if self.power_signal.is_set():
-            self.detection_signal.clear()
             self.power_signal.clear()
+
+    def suspend(self):
+        if self.detection_signal.is_set():
+            self.detection_signal.clear()
+            self.logger.info("Service suspended.")
+            
+    def resume(self):
+        if not self.detection_signal.is_set():
+            self.detection_signal.set()
+            self.logger.info("Service resumed.")
 
     def __crash_detector_job(self):
         # Setup gpio (if needed)
@@ -61,17 +76,21 @@ class CrashDetector:
         while self.detection_signal.wait():
             # Check if crashing button was pressed
             state = gpio.input(IOPins.PIN_CRASHING_BUTTON)
-            # Fire callback if button is pushed
+            # Check if button is pushed
             if prev_state != state:
                 if prev_state == gpio.LOW and state == gpio.HIGH:
-                    # Crash happened
-                    prev_state = state # Update prev state.
-                    self.detection_signal.clear()  # Suspend thread.
-                    self.callback.on_accident_happened() # Fire callback.
+                    # Crashhhhhhhhhhhhh ~(@-^-@)~
+                    self.suspend()  # Suspend thread.
+                    self.logger.info("Crash detected. Notifying system...")
+                    self.callback.on_accident_happened() # Notify callback.
+                # Update previous state
+                prev_state = state 
             # Stop detection if power signal is not set
             if not self.power_signal.is_set():
-                self.detection_signal.clear()
+                self.logger.info("Stopping service...")
+                self.suspend()
                 break
+            sleep(0.1)
         gpio.cleanup(assert_exists=False)
         self.logger.info("CrashDetection service stopped running.")
 
@@ -88,9 +107,13 @@ class Car:
         self.power_signal = Event()
         self.detection_signal = Event()
 
-        # Check car info
-        if self.missing_info:
-            self.logger.warning("There's no info associated with this car.")
+    @staticmethod
+    def get_default_info():
+        return CarInfo.get_default()
+    
+    @staticmethod
+    def build_car_info(id: str, model: str, owner: str, emergency: str):
+        return CarInfo(id, model, owner, emergency)
 
     def setup(self):
         self.logger.info("Intializing car...")
@@ -106,6 +129,12 @@ class Car:
         self.logger.success("Car is ready.")
 
     def set_car_info(self):
+        # Check car info
+        if not self.missing_info:
+            return
+        
+        self.logger.warning("Info associated with this car isn't complete.")
+        
         if len(self.chassis_id) == 0:
             self.logger.warning("No chassis id was set. Asking user to add it...")
             self.info.mapped[CarKeys.CAR_ID] = input('Enter chassis id: ')
@@ -124,7 +153,7 @@ class Car:
             sec_emerg = input('Enter secondary emergency contact: ')
             self.info.mapped[CarKeys.EMERGENCY] = f"{pri_emerg},{sec_emerg}"
 
-        self.logger.info(f"CarInfo was set: {self.info}")
+        self.logger.info(f"CarInfo was set:\n{self.info}")
 
     def start(self):
         self.crash_detector.start()
