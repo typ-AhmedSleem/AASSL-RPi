@@ -1,2 +1,7 @@
+# Folders
 __pycache__
+captures
+
+# Files
 test.py
+*.mp4

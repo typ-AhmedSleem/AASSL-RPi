@@ -25,10 +25,10 @@ class Accident:
 
     def as_dict(self, car):
         return {
-            # AccidentKeys.LATITUDE: f"{self.lat}",
-            # AccidentKeys.LONGITUDE: f"{self.lng}",
-            # AccidentKeys.TIMESTAMP: f"{self.timestamp}",
-            # AccidentKeys.TIMESTAMP: self.video_filename,
+            AccidentKeys.LATITUDE: f"{self.lat}",
+            AccidentKeys.LONGITUDE: f"{self.lng}",
+            AccidentKeys.TIMESTAMP: f"{self.timestamp}",
+            AccidentKeys.VIDEO: self.video_filename,
             CarKeys.CAR_ID: car.chassis_id,
             CarKeys.CAR_MODEL: car.model,
             CarKeys.CAR_OWNER: car.owner,
@@ -36,4 +36,25 @@ class Accident:
         }
 
     def as_json(self, car):
-        return to_json(self.as_dict(car))
+        return to_json(self.as_dict(car), indent=2)
+
+
+if __name__ == '__main__':
+    
+    from car import Car, CarInfo
+    import time
+
+    timestamp = time.time() * 1000
+
+    car = Car(CarInfo(id='5562', model="Toyota Supra", owner="Ahmed Sleem", emergency="010,011"))
+    car.setup()
+
+    accident = Accident(
+        lat=23.264841,
+        lng=-29.53912,
+        timestamp=timestamp,
+        video_filename=f"{timestamp}.mp4"
+    )
+
+    print(accident.as_dict(car))
+    print(accident.as_json(car))

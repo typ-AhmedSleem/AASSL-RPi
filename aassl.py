@@ -1,7 +1,7 @@
 from logger import Logger
 from data import Accident
 from car import Car, CarKeys
-from firebase import Firebase
+from accident_reporter import AccidentReporter
 
 
 class AASSL:
@@ -11,15 +11,15 @@ class AASSL:
         self.logger = Logger('AASSL')
         self.logger.info("Starting AASSL...")
 
-        # Server
-        self.firebase = Firebase()
-
         # Car
         self.car = Car()
         if self.car.missing_info:
             self.logger.warning("There's no info associated with car.")
         else:
             self.logger.info(f"CarInfo: {self.car.info}")
+            
+        # AccidentReporter
+        self.firebase = AccidentReporter()
 
         # Camera
         self.camera = None
@@ -39,11 +39,11 @@ class AASSL:
         self.logger.info("System is ready to start...")
 
     def start_system(self):
-        # Setup Firebase
-        self.firebase.setup()
-        
         # Setup car
         self.car.setup()
+        
+        # Setup AccidentReporter
+        self.firebase.setup()
         
         # Setup Camera
         

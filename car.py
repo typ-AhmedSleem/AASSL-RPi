@@ -1,5 +1,6 @@
 from data import CarKeys
 from logger import Logger
+from json import dumps as to_json
 
 
 class CarInfo:
@@ -12,7 +13,7 @@ class CarInfo:
         }
 
     def __repr__(self) -> str:
-        return str(self.mapped)
+        return str(to_json(self.mapped, indent=2))
 
 
 class Car:
