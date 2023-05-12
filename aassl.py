@@ -1,25 +1,22 @@
+from time import time as current_time
+
 from logger import Logger
-from data import Accident
-from car import Car, CarKeys
-from accident_reporter import AccidentReporter
+from gps import GPS, Coordinates
+from car import Car, CarInfo, CrashDetectorCallback
+from accident_reporter import AccidentReporter, Accident
 
 
-class AASSL:
+class AASSL(CrashDetectorCallback):
 
     def __init__(self) -> None:
-        # Logger
         self.logger = Logger('AASSL')
         self.logger.info("Starting AASSL...")
 
         # Car
-        self.car = Car()
-        if self.car.missing_info:
-            self.logger.warning("There's no info associated with car.")
-        else:
-            self.logger.info(f"CarInfo: {self.car.info}")
-            
+        self.car = Car(CarInfo.get_default(), self)
+
         # AccidentReporter
-        self.firebase = AccidentReporter()
+        self.accident_reporter = AccidentReporter()
 
         # Camera
         self.camera = None
@@ -27,7 +24,7 @@ class AASSL:
             self.logger.error("No camera was detected.")
 
         # GPS
-        self.gps = None
+        self.gps = GPS()
         if self.gps is None:
             self.logger.error("No GPS module was detected.")
 
@@ -38,23 +35,36 @@ class AASSL:
 
         self.logger.info("System is ready to start...")
 
-    def start_system(self):
+    def setup_system(self):
         # Setup car
         self.car.setup()
-        
+
         # Setup AccidentReporter
-        self.firebase.setup()
-        
-        # Setup Camera
-        
-        # Setup GSM
-        
+        self.accident_reporter.setup()
+
         # Setup GPS
+
+        # Setup Camera
+
+    def start_system(self):
+        pass
 
     def stop_system(self):
         # Stop system components
         # Exit
         exit(0)
+
+    def on_accident_happened(self):
+        # Build accident
+        timestamp = current_time() * 1000  # Timestamp in millis
+        filename = f"{timestamp}.mp4"
+        location = self.gps.last_known_location
+        accident_payload = Accident(
+            lat=location.lat,
+            lng=location.lng,
+            timestamp=timestamp,
+            video_filename=filename
+        ).as_dict(self.car)
 
 
 if __name__ == '__main__':

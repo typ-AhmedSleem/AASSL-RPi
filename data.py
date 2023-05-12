@@ -41,12 +41,12 @@ class Accident:
 
 if __name__ == '__main__':
     
-    from car import Car, CarInfo
+    from car import Car, CarInfo, CrashDetectorCallback
     import time
 
     timestamp = time.time() * 1000
 
-    car = Car(CarInfo(id='5562', model="Toyota Supra", owner="Ahmed Sleem", emergency="010,011"))
+    car = Car(CarInfo(id='5562', model="Toyota Supra", owner="Ahmed Sleem", emergency="010,011"), CrashDetectorCallback())
     car.setup()
 
     accident = Accident(

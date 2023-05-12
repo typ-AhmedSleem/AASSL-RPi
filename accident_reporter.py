@@ -7,22 +7,46 @@ from firebase_admin import (
     messaging,
     credentials,
 )
-from time import time as current_time
-from data import Accident, AccidentKeys
+from constants import FirebaseConstants
+
+from json import dumps as to_json
+
+class CarKeys:
+    CAR_ID = 'id'
+    CAR_MODEL = 'model'
+    CAR_OWNER = 'owner'
+    EMERGENCY = 'emergency'
 
 
-class Constants:
+class AccidentKeys:
+    LATITUDE = 'lat'
+    LONGITUDE = 'lng'
+    VIDEO = 'video'
+    TIMESTAMP = 'timestamp'
 
-    # FCM
-    TOKEN_REFERENCE = "fcm_token"
 
-    # Storage
-    STORAGE_BUCKET_URL = "aas-for-sl.appspot.com"
+class Accident:
 
-    # Firebase app
-    DATABASE_URL = "https://aas-for-sl-default-rtdb.firebaseio.com/"
-    CREDENTIALS_FILE_PATH = "aas-for-sl-firebase-adminsdk-dznrq-b0280663c2.json"
+    def __init__(self, lat, lng, timestamp, video_filename) -> None:
+        self.lat = lat
+        self.lng = lng
+        self.timestamp = timestamp
+        self.video_filename = video_filename
 
+    def as_dict(self, car):
+        return {
+            AccidentKeys.LATITUDE: f"{self.lat}",
+            AccidentKeys.LONGITUDE: f"{self.lng}",
+            AccidentKeys.TIMESTAMP: f"{self.timestamp}",
+            AccidentKeys.VIDEO: self.video_filename,
+            CarKeys.CAR_ID: car.chassis_id,
+            CarKeys.CAR_MODEL: car.model,
+            CarKeys.CAR_OWNER: car.owner,
+            CarKeys.EMERGENCY: car.emergency_contacts
+        }
+
+    def as_json(self, car):
+        return to_json(self.as_dict(car), indent=2)
 
 class AccidentReporter:
 
@@ -32,10 +56,10 @@ class AccidentReporter:
 
     def setup(self):
         self.logger.info("Initializing AccidentReporter...")
-        cred = credentials.Certificate(Constants.CREDENTIALS_FILE_PATH)
+        cred = credentials.Certificate(FirebaseConstants.CREDENTIALS_FILE_PATH)
         firebase_admin.initialize_app(cred, {
-            'databaseURL': Constants.DATABASE_URL,
-            'storageBucket': Constants.STORAGE_BUCKET_URL
+            'databaseURL': FirebaseConstants.DATABASE_URL,
+            'storageBucket': FirebaseConstants.STORAGE_BUCKET_URL
         })
 
         self.logger.info("Initializing Storage...")
@@ -44,14 +68,14 @@ class AccidentReporter:
         self.logger.info("Initializing FCM...")
         self.fcm = FirebaseCloudMessaging()
 
-        self.logger.success("Firebase is ready.")
+        self.logger.success("AccidentReporter is ready.")
 
     def report_accident(self, accident_payload: dict[str, str]):
-        self.logger.info("Preparing to broadcast an accident.")
+        self.logger.info("Preparing to report an accident.")
         # Check payload first
         if accident_payload is None or len(accident_payload) == 0:
-            self.logger.error("Accident is either None or Empty. Aborted broadcast.")
-            return
+            self.logger.error("Accident is either None or Empty. Aborted reporting.")
+            return False
 
         # Obtain video filename and path from payload
         filename = accident_payload.get(AccidentKeys.VIDEO, "")
@@ -60,15 +84,23 @@ class AccidentReporter:
         # Check filename and path
         if utils.isempty(filename) or not utils.capture_file_exists(filename):
             self.logger.error("Can't find video file associated with this accident.")
-            return
+            return False
 
-        self.logger.info("Broadcasting accident...")
+        self.logger.info("Reporting accident...")
         # Upload video to storage
         self.logger.info(f"Preparing to upload file '{filepath}' ...")
-        self.storage.upload_file(filepath, filename)
+        uploaded = self.storage.upload_file(filepath, filename)
 
         # Send push notification to client app
-        self.fcm.send_notification(accident_payload)
+        sent = self.fcm.send_notification(accident_payload)
+
+        reported = uploaded and sent
+        if reported:
+            self.logger.success("Accident reported successfully.")
+        else:
+            self.logger.error("Couldn't report accident.")
+
+        return reported
 
 
 class FirebaseStorage:
@@ -95,9 +127,11 @@ class FirebaseStorage:
             blob_file = self.bucket.blob(remote_path)
             blob_file.upload_from_filename(filepath)
             self.logger.success("Video uploaded successfully.")
+            return True
         except Exception as e:
-            self.logger.error(e.args[0])
+            # self.logger.error(e.args[0])
             self.logger.error(f"Can't upload video to remote storage.")
+            return False
 
 
 class FirebaseCloudMessaging:
@@ -111,7 +145,7 @@ class FirebaseCloudMessaging:
     def refresh_token(self):
         try:
             self.logger.info("Refreshing token...")
-            ref = db.reference(Constants.TOKEN_REFERENCE)
+            ref = db.reference(FirebaseConstants.TOKEN_REFERENCE)
 
             # Check if token was refreshed at least once
             token = ref.get(True)
@@ -124,7 +158,7 @@ class FirebaseCloudMessaging:
                 self.logger.info(f"Token refreshed successfully.")
             return True
         except Exception as e:
-            self.logger.error(e.args[0])
+            # self.logger.error(e.args[0])
             self.logger.error(f"Can't refresh token.")
             return False
 
@@ -132,14 +166,14 @@ class FirebaseCloudMessaging:
         # Check if payload is empty
         if utils.isempty(payload):
             self.logger.error("Can't send notification to device. Payload is empty.")
-            return
+            return False
 
         # Refresh token
         refreshed = self.refresh_token()
 
         # Check token after being refreshed
         if not refreshed or utils.isempty(self.token):
-            return
+            return False
 
         try:
             # Create the message
@@ -151,6 +185,8 @@ class FirebaseCloudMessaging:
             response: str = messaging.send(accident_msg)
             id_idx = response.find(':') + 1
             self.logger.success(f"Sent message. id= {response[id_idx:]}")
+            return True
         except Exception as e:
             self.logger.error(e.args[0])
             self.logger.error(f"Can't send accident to client app.")
+            return False
