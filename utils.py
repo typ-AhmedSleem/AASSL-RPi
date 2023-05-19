@@ -1,4 +1,5 @@
 import random
+from time import sleep
 from os import path, mkdir
 
 CAPTURES_DIR_NAME = 'captures/'
@@ -62,6 +63,7 @@ class gpio:
 
     @staticmethod
     def input(pin) -> int:
+        sleep(1)
         return random.choice([0, 1])
 
 

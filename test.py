@@ -18,6 +18,7 @@ if __name__ == '__main__':
     # Test System
     import utils
     import random
+    from math import floor
     from time import time as current_time, sleep
     from car import Car, CrashDetectorCallback
     from accident_reporter import AccidentReporter, Accident
@@ -28,7 +29,7 @@ if __name__ == '__main__':
             sleep(0.5)
             reporter.logger.info("Creating accident record...")
             # Build accident
-            timestamp = current_time() * 1000  # Timestamp in millis
+            timestamp = floor(current_time() * 1000)  # Timestamp in millis
             filename = f"{timestamp}.mp4"
             accident = Accident(
                 lat=random.random() * 30,

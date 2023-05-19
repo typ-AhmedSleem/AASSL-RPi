@@ -1,3 +1,4 @@
+import math
 from time import time as current_time
 
 from logger import Logger
@@ -17,7 +18,7 @@ class AASSL(CrashDetectorCallback):
         self.car = Car(CarInfo.get_default(), self)
 
         # AccidentReporter
-        self.accident_reporter = AccidentReporter()
+        self.crash_reporter = AccidentReporter()
 
         # Camera
         self.camera = Camera()
@@ -34,38 +35,44 @@ class AASSL(CrashDetectorCallback):
     def setup_system(self):
         self.car.setup()
         self.gps.setup()
-        # self.camera.setup()
-        self.accident_reporter.setup()
+        self.camera.setup()
+        self.crash_reporter.setup()
 
     def start_system(self):
         # Start system components
         self.car.start()
         self.gps.start()
-        # self.camera.start()
+        self.camera.start()
 
     def stop_system(self):
         # Stop system components
         self.car.stop()
         self.gps.stop()
-        # self.camera.stop()
+        self.camera.stop()
         # Exit
         exit(0)
 
     def on_accident_happened(self):
-        # Build accident
-        timestamp = current_time() * 1000  # Timestamp in millis
-        filename = f"{timestamp}.mp4"
+        self.logger.info("Received crash signal from CrashDetector. Handling...")
+        
+        # Build accident #
+        timestamp = math.floor(current_time() * 1000)  # Timestamp in millis
+        filename = self.camera.save_captured_video(timestamp)
         location = self.gps.last_known_location
-        accident_payload = Accident(
+        accident = Accident(
             lat=location[0],
             lng=location[1],
             timestamp=timestamp,
             video_filename=filename
-        ).as_dict(self.car)
+        )
+        
+        # Report accident
+        self.logger.info("Build accident record:\n{}".format(accident.as_json(self.car)))
+        self.crash_reporter.report_accident(accident.as_dict(self.car))
 
 
 if __name__ == '__main__':
     aassl = AASSL()
     aassl.setup_system()
     aassl.start_system()
-    aassl.stop_system()
+    # aassl.stop_system()

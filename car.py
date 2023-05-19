@@ -60,7 +60,7 @@ class CrashDetector:
         if self.detection_signal.is_set():
             self.detection_signal.clear()
             self.logger.info("Service suspended.")
-            
+
     def resume(self):
         if not self.detection_signal.is_set():
             self.detection_signal.set()
@@ -79,12 +79,13 @@ class CrashDetector:
             # Check if button is pushed
             if prev_state != state:
                 if prev_state == gpio.LOW and state == gpio.HIGH:
+                    count = 0
                     # Crashhhhhhhhhhhhh ~(@-^-@)~
                     self.suspend()  # Suspend thread.
                     self.logger.info("Crash detected. Notifying system...")
-                    self.callback.on_accident_happened() # Notify callback.
+                    self.callback.on_accident_happened()  # Notify callback.
                 # Update previous state
-                prev_state = state 
+                prev_state = state
             # Stop detection if power signal is not set
             if not self.power_signal.is_set():
                 self.logger.info("Stopping service...")
@@ -110,7 +111,7 @@ class Car:
     @staticmethod
     def get_default_info():
         return CarInfo.get_default()
-    
+
     @staticmethod
     def build_car_info(id: str, model: str, owner: str, emergency: str):
         return CarInfo(id, model, owner, emergency)
@@ -132,9 +133,9 @@ class Car:
         # Check car info
         if not self.missing_info:
             return
-        
+
         self.logger.warning("Info associated with this car isn't complete.")
-        
+
         if len(self.chassis_id) == 0:
             self.logger.warning("No chassis id was set. Asking user to add it...")
             self.info.mapped[CarKeys.CAR_ID] = input('Enter chassis id: ')
