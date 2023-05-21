@@ -35,11 +35,17 @@ class PiCamera:
 
     def capture_continuous(self, frame_buffer: PiRGBArray, format='bgr', use_video_port=False):
         while self.running:
-            ret, frame = self.cap.read()
-            if ret:
-                image = np.array(frame)
-                frame_buffer.array = image
-                yield image
-            else:
+            try:
+                ret, frame = self.cap.read()
+                if ret:
+                    image = np.array(frame)
+                    frame_buffer.array = image
+                    yield image
+                else:
+                    self.running = False
+                    break
+            except Exception as e:
+                print(e)
+                self.cap.release()
                 self.running = False
                 break

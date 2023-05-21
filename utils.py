@@ -69,8 +69,7 @@ class gpio:
 
 if __name__ == '__main__':
 
-    filename = '123.mp4'
-
+    filename = '123.mp4'    
     print()
     print()
     print(get_captures_dir_path())

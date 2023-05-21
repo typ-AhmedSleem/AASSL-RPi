@@ -24,10 +24,10 @@ class CarInfo:
     @staticmethod
     def get_default():
         return CarInfo(
-            id='',
-            model='',
-            owner='',
-            emergency=''
+            id='2201',
+            model='Hyundai Tucson',
+            owner='Ahmed Sleem',
+            emergency='010,011'
         )
 
 

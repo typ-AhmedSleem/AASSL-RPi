@@ -1,8 +1,8 @@
 import math
-from time import time as current_time
+from time import time as current_time, sleep
 
 from logger import Logger
-from camera import Camera
+from camera import Camera, VideoBuffer
 from gps import GPS
 from car import Car, CarInfo, CrashDetectorCallback
 from accident_reporter import AccidentReporter, Accident
@@ -45,19 +45,51 @@ class AASSL(CrashDetectorCallback):
         self.camera.start()
 
     def stop_system(self):
+        self.logger.info("Stopping system...")
         # Stop system components
         self.car.stop()
         self.gps.stop()
         self.camera.stop()
+        self.logger.info("System stopped.")
         # Exit
         exit(0)
 
     def on_accident_happened(self):
         self.logger.info("Received crash signal from CrashDetector. Handling...")
-        
-        # Build accident #
+        # Wait until camera is initialized if it not
+        if not self.camera.initialized:
+            self.logger.info("Waiting for camera to initialize.")
+            self.camera.initialized_signal.wait()
+            self.logger.info("Camera is initialized.")
+        # Build accident model
         timestamp = math.floor(current_time() * 1000)  # Timestamp in millis
-        filename = self.camera.save_captured_video(timestamp)
+        # Get before accident video buffer from camera
+        while self.camera.video_buffer.occupied_size < self.camera.video_buffer.max_frame_count:
+            # self.logger.info("Waiting for camera to fill buffer. Current= {}".format(self.camera.video_buffer.occupied_size))
+            sleep(0.1)
+        
+        self.camera.suspend()
+        buffer_before_accident = self.camera.video_buffer
+        self.logger.info("Grabbed before accident video buffer: {}".format(buffer_before_accident))
+        
+        # Resume the camera
+        self.camera.resume()
+        self.logger.info("Capturing 5 secs after accident...")
+        # Wait for camera to capture the next 5 secs video
+        self.camera.capture_after_accident_signal.wait(5)
+        self.camera.capture_after_accident_signal.clear()
+        
+        # Get after accident buffer from camera
+        buffer_after_accident = self.camera.video_buffer
+        self.logger.info("Grabbed after accident video buffer: {}".format(buffer_after_accident))
+
+        buffer_accident_video = VideoBuffer(
+            buf_before=buffer_before_accident,
+            buf_after=buffer_after_accident
+        )
+        self.logger.info("Total accident video buffer: {}".format(buffer_accident_video))
+        # Save the video
+        filename = self.camera.save_captured_video(buffer_accident_video, timestamp)
         location = self.gps.last_known_location
         accident = Accident(
             lat=location[0],
@@ -65,10 +97,11 @@ class AASSL(CrashDetectorCallback):
             timestamp=timestamp,
             video_filename=filename
         )
-        
+
         # Report accident
         self.logger.info("Build accident record:\n{}".format(accident.as_json(self.car)))
         self.crash_reporter.report_accident(accident.as_dict(self.car))
+        self.stop_system()
 
 
 if __name__ == '__main__':
