@@ -1,4 +1,4 @@
-from utils import gpio
+import RPi.GPIO as gpio
 from logger import Logger
 from constants import IOPins
 from accident_reporter import CarKeys
@@ -69,6 +69,7 @@ class CrashDetector:
     def __crash_detector_job(self):
         # Setup gpio (if needed)
         gpio.setmode(gpio.BCM)
+        gpio.setwarnings(False)
         gpio.setup(pin=IOPins.PIN_CRASHING_BUTTON, mode=gpio.IN, pullup=True)
         prev_state = gpio.LOW
         # Start detection

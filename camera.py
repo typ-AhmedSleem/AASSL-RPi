@@ -3,8 +3,8 @@ import cv2 as cv
 from time import sleep, time as current_time
 from logger import Logger
 from threading import Event, Thread
-from numpy import zeros, int8 as INT8
-from picamera import PiCamera, PiRGBArray
+import picamera2
+from io import BytesIO
 
 
 class VideoBuffer:
@@ -62,10 +62,9 @@ class Camera:
         self.logger.success("Created Camera instance. Waiting for setup...")
 
     def setup(self):
-        self.picamera = PiCamera()
-        self.picamera.vflip = self.vflip
-        self.picamera.framerate = self.framerate
-        self.picamera.resolution = self.resolution
+        # Create camera instance and configure it
+        self.picamera = picamera2.Picamera2()
+        self.picamera.configure(self.picamera.create_video_configuration())
         self.logger.success("Setup complete. Camera is ready.")
 
     def start(self):
@@ -77,8 +76,11 @@ class Camera:
 
     def stop(self):
         if self.recording:
-            self.recording_signal.clear()
-            self.picamera.close()
+            try:
+                self.picamera.close()
+                self.recording_signal.clear()
+            except RuntimeError:
+                self.logger.error("Can't close camera.")
 
     @property
     def recording(self):
@@ -99,7 +101,7 @@ class Camera:
     def suspend(self):
         if not self.suspended:
             self.suspending_switcher.set()
-            
+
     def resume(self):
         if self.suspended:
             self.suspending_switcher.clear()
@@ -140,34 +142,23 @@ class Camera:
         self.initialized_signal.set()
         # Allow the camera to wrap up
         sleep(0.1)
-        # Create frame buffer to hold every frame captured
-        frame_buffer = PiRGBArray(self.picamera, self.resolution)
         # Start capturing frames from camera
-        for _ in self.picamera.capture_continuous(frame_buffer, format='bgr', use_video_port=True):
-            self.logger.info("Processing frame...")
+        while self.recording:
             # Skip frame if camera is saving video
             if self.saving or self.suspended:
                 continue
-            
+            self.logger.info("Processing captured frame...")
             # Grab the frame then process it
-            image = frame_buffer.array
-
+            frame = self.picamera.capture_array(wait=True)
             # Push frame to video buffer
-            self.video_buffer.push(image)
+            self.video_buffer.push(frame)
 
-            # Clear frame buffer to write next frame
-            frame_buffer.truncate(0)
-
-            # Check whether camera switcher is switched off
-            if not self.recording:
-                self.logger.info("Camera received stop recording signal.")
-                break
-
-        # Switcher is off now
-        frame_buffer.close()
-        self.recording_signal.clear()
-        self.initialized_signal.clear()
+        # Poweroff camera and join thread
         self.picamera.close()
+        self.saving_switcher.clear()
+        self.initialized_signal.clear()
+        self.suspending_switcher.clear()
+        self.capture_after_accident_signal.clear()
         self.logger.info("Stopped recording.")
 
 

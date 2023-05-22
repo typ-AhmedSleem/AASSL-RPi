@@ -11,7 +11,7 @@ class GPS:
         self.switcher = Event()
         self.logger = Logger("GPS")
         self.serial = serial.Serial(port=GPS_SERIAL_PORT, baudrate=9600, timeout=1)
-        self.last_known_location = (0.0, 0.0)
+        self.last_known_location = (30.0346762, 31.4295489)
 
     def setup(self):
         # idk what to do here (oO)

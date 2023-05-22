@@ -1,7 +1,7 @@
-GPS_SERIAL_PORT = None # TODO: replace to /dev/ttyUSB0
+GPS_SERIAL_PORT = '/dev/ttyS0'
 
 class IOPins:
-    PIN_CRASHING_BUTTON = 1
+    PIN_CRASHING_BUTTON = 17 # BCM numbering mode
 
 class FirebaseConstants:
 
