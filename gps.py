@@ -2,16 +2,18 @@ import serial
 from time import sleep
 from logger import Logger
 from threading import Thread, Event
-from constants import GPS_SERIAL_PORT
+from constants import GPS_UART_PORT, GPS_UART_BAUDRATE
 
 
 class GPS:
 
     def __init__(self) -> None:
+        self.DEFAULT_LOC = (30.0346762, 31.4295489)
+        
         self.switcher = Event()
         self.logger = Logger("GPS")
-        self.serial = serial.Serial(port=GPS_SERIAL_PORT, baudrate=9600, timeout=1)
-        self.last_known_location = (30.0346762, 31.4295489)
+        self.serial = serial.Serial(port=GPS_UART_PORT, baudrate=GPS_UART_BAUDRATE, timeout=1)
+        self.last_known_location = self.DEFAULT_LOC
 
     def setup(self):
         # idk what to do here (oO)
@@ -28,17 +30,17 @@ class GPS:
             self.switcher.clear()
 
     @property
-    def is_serial_open(self):
+    def serial_open(self):
         """ Checks whether the serial is open and active or not
 
         Returns:
             bool: True only if serial is created and open, False otherwise.
         """
-        return (self.serial is not None) and self.serial.is_open
+        return (self.serial is not None) and not self.serial.closed
 
     def __gps_worker_job(self):
         self.logger.info("GPS service started.")
-        while self.switcher.is_set() and self.is_serial_open:
+        while self.switcher.is_set() and self.serial_open:
             # Get location updates
             try:
                 line = self.serial.readline().decode().strip()
@@ -55,8 +57,6 @@ class GPS:
                     self.logger.info(f"New location update: Lat= {self.last_known_location[0]} | Lng= {self.last_known_location[1]}")
                     # Wait a sec to warmup
                     sleep(1)
-            except Exception as e:
-                self.logger.error(f"Faced an error while working. {e}")
-                self.switcher.clear()
-                break
+            except:
+                sleep(2.5)
         self.logger.info("GPS service stopped.")

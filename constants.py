@@ -1,4 +1,10 @@
-GPS_SERIAL_PORT = '/dev/ttyS0'
+# GPS module UART config
+GPS_UART_PORT = '/dev/ttyS0'
+GPS_UART_BAUDRATE = 9600
+
+# GSM module UART config
+GSM_UART_PORT = '/dev/ttyAMA1'
+GSM_UART_BAUDRATE = 115200
 
 class IOPins:
     PIN_CRASHING_BUTTON = 17 # BCM numbering mode
