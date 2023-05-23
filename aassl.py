@@ -22,7 +22,7 @@ class AASSL(CrashDetectorCallback):
         self.crash_reporter = AccidentReporter()
 
         # Camera
-        self.camera = Camera(duration=10)
+        self.camera = Camera(duration=5)
         if self.camera is None:
             self.logger.error("No camera was detected.")
 

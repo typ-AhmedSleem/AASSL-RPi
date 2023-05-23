@@ -15,9 +15,9 @@ class VideoBuffer:
         self.max_frame_count = max_frame_count
         self.__data = []
         if 'buf_before' in buffers:
-            self.__data + buffers['buf_before'].__data
+            self.__data.extend(buffers['buf_before'])
         if 'buf_after' in buffers:
-            self.__data + buffers['buf_after'].__data
+            self.__data.extend(buffers['buf_after'])
             
     def __iter__(self):
         for frame in self.__data:
