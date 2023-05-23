@@ -78,7 +78,7 @@ class AASSL(CrashDetectorCallback):
         self.logger.info("Capturing 5 secs after accident...")
         # Wait for camera to capture the next 5 secs video
         self.camera.resume()
-        self.camera.video_buffer = VideoBuffer(self.camera.DURATION_FRAMES_COUNT)
+        # self.camera.video_buffer = VideoBuffer(self.camera.DURATION_FRAMES_COUNT)
         while self.camera.video_buffer.occupied_size < self.camera.video_buffer.max_frame_count:
             self.logger.info("Filling after accident camera buffer. InBufferNow= {}".format(self.camera.video_buffer.occupied_size))
             # sleep(0.1)
