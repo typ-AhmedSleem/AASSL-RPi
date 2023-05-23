@@ -18,7 +18,7 @@ class VideoBuffer:
             self.__data + buffers['buf_before'].__data
         if 'buf_after' in buffers:
             self.__data + buffers['buf_after'].__data
-
+            
     def __iter__(self):
         for frame in self.__data:
             yield frame
