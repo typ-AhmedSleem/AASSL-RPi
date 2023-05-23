@@ -74,7 +74,7 @@ class AASSL(CrashDetectorCallback):
         self.logger.info("Grabbed before accident video buffer: {}".format(buffer_before_accident))
         
         # Resume the camera
-        self.camera.video_buffer.clear()
+        # self.camera.video_buffer.clear()
         self.logger.info("Capturing 5 secs after accident...")
         # Wait for camera to capture the next 5 secs video
         self.camera.resume()

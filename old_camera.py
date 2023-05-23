@@ -102,7 +102,7 @@ class Camera:
             self.logger.info(f"Saving video in buffer.. Dur[{self.VIDEO_DURATION}] Res[{self.resolution}] FR[{self.framerate}] Frames[{video_buffer.occupied_size}]")
             for frame in video_buffer:
                 writer.write(frame)  # Write frame to video file.
-            video_buffer.clear()
+            # video_buffer.clear()
             self.logger.success("Video was saved successfully to {}".format(filepath))
         except Exception as e:
             self.logger.error(e)
