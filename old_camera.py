@@ -159,7 +159,7 @@ class Camera:
 
                 # Clear frame buffer to write next frame
                 frame_buffer.truncate(0)
-                self.logger.info("Pushed frame to buffer.")
+                # self.logger.info("Pushed frame to buffer.")
                 # Check whether camera switcher is switched off
                 if not self.recording:
                     break
