@@ -4,14 +4,9 @@ from time import sleep, time as current_time
 from logger import Logger
 from threading import Event, Thread
 from numpy import zeros, int8 as INT8
-
-IS_RPI = False
-if IS_RPI:
-    from picamerax import PiCamera
-    from picamerax.array import PiRGBArray
-else:
-    from picamera import PiCamera
-    from picamera.array import PiRGBArray
+# Picamera
+from picamera import PiCamera
+from picamera.array import PiRGBArray
 
 
 class VideoBuffer:
@@ -41,6 +36,7 @@ class VideoBuffer:
 
     def clear(self):
         self.__data.clear()
+        print("Buffer cleared.")
 
     def __repr__(self) -> str:
         return f'VideoBuffer[frames_count= {self.occupied_size}]'
@@ -136,15 +132,15 @@ class Camera:
     def suspend(self):
         if not self.suspended:
             self.suspending_switcher.set()
+            self.logger.info("Camera suspended.")
 
     def resume(self):
         if self.suspended:
             self.suspending_switcher.clear()
+            self.logger.info("Camera resumed.")
 
     def __camera_worker(self):
         self.logger.info("Starting Camera...")
-        # Start the picamera
-        #self.picamera.start()
         # Allow the camera to wrap up
         sleep(0.1)
         # Create frame buffer to hold every frame captured
@@ -155,7 +151,6 @@ class Camera:
                 # Skip frame if camera is saving video or camera is suspended
                 if self.saving or self.suspended:
                     continue
-                # self.logger.info("Processing frame...")
                 # Grab the frame then process it
                 image = frame_buffer.array
 
@@ -164,7 +159,7 @@ class Camera:
 
                 # Clear frame buffer to write next frame
                 frame_buffer.truncate(0)
-
+                self.logger.info("Pushed frame to buffer.")
                 # Check whether camera switcher is switched off
                 if not self.recording:
                     break

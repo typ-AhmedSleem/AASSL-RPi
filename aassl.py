@@ -56,7 +56,7 @@ class AASSL(CrashDetectorCallback):
         exit(0)
 
     def on_accident_happened(self):
-        self.logger.info("Received crash signal from CrashDetector. Handlingit on thread: {}".format(threading.currentThread().name))
+        self.logger.info("Received crash signal from CrashDetector. Handling it on thread: {}".format(threading.currentThread().name))
         # Wait until camera is initialized if it not
         if not self.camera.initialized:
             self.logger.info("Waiting for camera to initialize.")
@@ -66,10 +66,10 @@ class AASSL(CrashDetectorCallback):
         timestamp = math.floor(current_time() * 1000)  # Timestamp in millis
         # Get before accident video buffer from camera
         while self.camera.video_buffer.occupied_size < self.camera.video_buffer.max_frame_count:
-            self.logger.info("Waiting for camera to fill buffer. Current= {}".format(self.camera.video_buffer.occupied_size))
+            self.logger.info("Filling before accident camera buffer. InBufferNow= {}".format(self.camera.video_buffer.occupied_size))
             sleep(0.1)
         
-        #self.camera.suspend()
+        self.camera.suspend()
         buffer_before_accident = self.camera.video_buffer
         self.logger.info("Grabbed before accident video buffer: {}".format(buffer_before_accident))
         
@@ -77,8 +77,10 @@ class AASSL(CrashDetectorCallback):
         self.camera.video_buffer.clear()
         self.logger.info("Capturing 5 secs after accident...")
         # Wait for camera to capture the next 5 secs video
-        #self.camera.resume()
-        sleep(5)
+        self.camera.resume()
+        while self.camera.video_buffer.occupied_size < self.camera.video_buffer.max_frame_count:
+            self.logger.info("Filling after accident camera buffer. InBufferNow= {}".format(self.camera.video_buffer.occupied_size))
+            sleep(0.1)
         
         # Get after accident buffer from camera
         buffer_after_accident = self.camera.video_buffer
