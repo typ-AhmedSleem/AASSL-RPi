@@ -16,8 +16,10 @@ class VideoBuffer:
         self.__data = []
         if 'buf_before' in buffers:
             self.__data.extend(buffers['buf_before'])
+            print("Extended buffer with before accident. CurrentInBuffer= {}".format(self.occupied_size))
         if 'buf_after' in buffers:
             self.__data.extend(buffers['buf_after'])
+            print("Extended buffer with after accident. CurrentInBuffer= {}".format(self.occupied_size))
             
     def __iter__(self):
         for frame in self.__data:
