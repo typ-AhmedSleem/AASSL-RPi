@@ -87,8 +87,7 @@ class AASSL(CrashDetectorCallback):
         self.logger.info("Grabbed after accident video buffer: {}".format(buffer_after_accident))
 
         buffer_accident_video = VideoBuffer(
-            buf_before=buffer_before_accident,
-            buf_after=buffer_after_accident
+            buf_before=buffer_before_accident
         )
         self.logger.info("Total accident video buffer: {}".format(buffer_accident_video))
         # Save the video
