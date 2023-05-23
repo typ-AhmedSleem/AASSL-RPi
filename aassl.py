@@ -90,7 +90,8 @@ class AASSL(CrashDetectorCallback):
         buffer_accident_video = VideoBuffer(
             buf_before=buffer_before_accident
         )
-        self.logger.info("Total accident video buffer: {}".format(buffer_before_accident))
+        buffer_accident_video = buffer_before_accident
+        self.logger.info("Total accident video buffer: {}".format(buffer_accident_video))
         # Save the video
         filename = self.camera.save_captured_video(buffer_accident_video, timestamp)
         location = self.gps.last_known_location
