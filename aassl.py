@@ -74,13 +74,13 @@ class AASSL(CrashDetectorCallback):
         self.logger.info("Grabbed before accident video buffer: {}".format(buffer_before_accident))
         
         # Resume the camera
-        # self.camera.video_buffer.clear()
+        self.camera.video_buffer.clear()
         self.logger.info("Capturing 5 secs after accident...")
         # Wait for camera to capture the next 5 secs video
         self.camera.resume()
         self.camera.video_buffer = VideoBuffer(self.camera.DURATION_FRAMES_COUNT)
-        # while self.camera.video_buffer.occupied_size < self.camera.video_buffer.max_frame_count:
-        #     self.logger.info("Filling after accident camera buffer. InBufferNow= {}".format(self.camera.video_buffer.occupied_size))
+        while self.camera.video_buffer.occupied_size < self.camera.video_buffer.max_frame_count:
+            self.logger.info("Filling after accident camera buffer. InBufferNow= {}".format(self.camera.video_buffer.occupied_size))
             # sleep(0.1)
         
         # Get after accident buffer from camera
@@ -88,9 +88,9 @@ class AASSL(CrashDetectorCallback):
         self.logger.info("Grabbed after accident video buffer: {}".format(buffer_after_accident))
 
         buffer_accident_video = VideoBuffer(
-            buf_before=buffer_before_accident
+            buf_before=buffer_before_accident,
+            buf_after= buffer_after_accident
         )
-        buffer_accident_video = buffer_before_accident
         self.logger.info("Total accident video buffer: {}".format(buffer_accident_video))
         # Save the video
         filename = self.camera.save_captured_video(buffer_accident_video, timestamp)
