@@ -1,5 +1,5 @@
 # GPS module UART config
-GPS_UART_PORT = '/dev/ttyS0'
+GPS_UART_PORT = '/dev/ttyAMA0'
 GPS_UART_BAUDRATE = 9600
 
 # GSM module UART config

@@ -24,9 +24,9 @@ class CarInfo:
     @staticmethod
     def get_default():
         return CarInfo(
-            id='2201',
-            model='Hyundai Tucson',
-            owner='Ahmed Sleem',
+            id='1223',
+            model='Toyota Supra',
+            owner='Ahmed',
             emergency='010,011'
         )
 
@@ -70,17 +70,16 @@ class CrashDetector:
         # Setup gpio (if needed)
         gpio.setmode(gpio.BCM)
         gpio.setwarnings(False)
-        gpio.setup(pin=IOPins.PIN_CRASHING_BUTTON, mode=gpio.IN, pullup=True)
+        gpio.setup(IOPins.PIN_CRASHING_BUTTON, gpio.IN, gpio.PUD_DOWN)
         prev_state = gpio.LOW
         # Start detection
         self.logger.success("CrashDetection service started running.")
         while self.detection_signal.wait():
             # Check if crashing button was pressed
             state = gpio.input(IOPins.PIN_CRASHING_BUTTON)
-            # Check if button is pushed
+            #self.logger.info(f"New state: {state} | PrevState: {prev_state}")
             if prev_state != state:
                 if prev_state == gpio.LOW and state == gpio.HIGH:
-                    count = 0
                     # Crashhhhhhhhhhhhh ~(@-^-@)~
                     self.suspend()  # Suspend thread.
                     self.logger.info("Crash detected. Notifying system...")
@@ -182,3 +181,14 @@ class Car:
     @property
     def emergency_contacts(self):
         return self.info.mapped.get(CarKeys.EMERGENCY, '')
+
+class TestCallback(CrashDetectorCallback):
+    
+    def on_accident_happened(self):
+        sleep(2)
+        car.crash_detector.resume()
+
+if __name__ == '__main__':
+    car = Car(CarInfo.get_default(), TestCallback())
+    car.setup()
+    car.start()

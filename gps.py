@@ -9,20 +9,25 @@ class GPS:
 
     def __init__(self) -> None:
         self.DEFAULT_LOC = (30.0346762, 31.4295489)
-        
         self.switcher = Event()
+        self.serial = None
         self.logger = Logger("GPS")
-        self.serial = serial.Serial(port=GPS_UART_PORT, baudrate=GPS_UART_BAUDRATE, timeout=1)
         self.last_known_location = self.DEFAULT_LOC
 
     def setup(self):
-        # idk what to do here (oO)
+        self.open_serial_port()
         self.logger.success("GPS is ready.")
+
+    def open_serial_port(self):
+        try:
+            self.serial = serial.Serial(port=GPS_UART_PORT, baudrate=GPS_UART_BAUDRATE, timeout=1)
+            self.logger.success("Opened GPS serial port")
+        except Exception as e:
+            self.logger.error("Can't open GPS serial port. Reason: {}".format(e))
 
     def start(self):
         if not self.switcher.is_set():
-            self.switcher.set()
-            self.serial.close()
+            self.switcher.clear()
             Thread(name="GPS", target=self.__gps_worker_job).start()
 
     def stop(self):
@@ -40,7 +45,11 @@ class GPS:
 
     def __gps_worker_job(self):
         self.logger.info("GPS service started.")
-        while self.switcher.is_set() and self.serial_open:
+        while True:
+            # Open serial port if not opened
+            if not self.serial_open:
+                self.open_serial_port()
+                #sleep(1)
             # Get location updates
             try:
                 line = self.serial.readline().decode().strip()
@@ -57,6 +66,12 @@ class GPS:
                     self.logger.info(f"New location update: Lat= {self.last_known_location[0]} | Lng= {self.last_known_location[1]}")
                     # Wait a sec to warmup
                     sleep(1)
-            except:
-                sleep(2.5)
+            except Exception as e:
+                #self.logger.warning(e)
+                sleep(2)
         self.logger.info("GPS service stopped.")
+
+if __name__ =='__main__':
+    gps = GPS()
+    gps.setup()
+    gps.start()
