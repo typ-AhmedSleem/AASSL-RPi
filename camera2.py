@@ -3,24 +3,19 @@ import cv2 as cv
 from time import sleep, time as current_time
 from logger import Logger
 from threading import Event, Thread
-from numpy import zeros, int8 as INT8
-# Picamera
-from picamera import PiCamera
-from picamera.array import PiRGBArray
+import picamera2
+from io import BytesIO
 
 
 class VideoBuffer:
-    
     def __init__(self, max_frame_count=0, **buffers) -> None:
         self.max_frame_count = max_frame_count
         self.__data = []
         if 'buf_before' in buffers:
             self.__data.extend(buffers['buf_before'])
-            print("Extended buffer with before accident. CurrentInBuffer= {}".format(self.occupied_size))
         if 'buf_after' in buffers:
             self.__data.extend(buffers['buf_after'])
-            print("Extended buffer with after accident. CurrentInBuffer= {}".format(self.occupied_size))
-            
+
     def __iter__(self):
         for frame in self.__data:
             yield frame
@@ -38,14 +33,14 @@ class VideoBuffer:
 
     def clear(self):
         self.__data.clear()
-        print("Buffer cleared.")
 
     def __repr__(self) -> str:
         return f'VideoBuffer[frames_count= {self.occupied_size}]'
 
+
 class Camera:
 
-    def __init__(self, resolution=(640, 480), framerate=30, vflip=False, duration=5) -> None:
+    def __init__(self, resolution=(640, 480), framerate=30, vflip=True, duration=5) -> None:
         # Camera params
         self.vflip = vflip
         self.framerate = framerate
@@ -67,11 +62,9 @@ class Camera:
         self.logger.success("Created Camera instance. Waiting for setup...")
 
     def setup(self):
-        self.picamera = PiCamera()
-        self.picamera.vflip = self.vflip
-        self.picamera.framerate = self.framerate
-        self.picamera.resolution = self.resolution
-        self.initialized_signal.set()
+        # Create camera instance and configure it
+        self.picamera = picamera2.Picamera2()
+        self.picamera.configure(self.picamera.create_video_configuration())
         self.logger.success("Setup complete. Camera is ready.")
 
     def start(self):
@@ -83,37 +76,11 @@ class Camera:
 
     def stop(self):
         if self.recording:
-            self.recording_signal.clear()
-            self.picamera.close()
-
-    def save_captured_video(self, video_buffer: VideoBuffer, timestamp: int):
-        """ Saves the captured video recorded in video buffer to local storage
-            then returns the path of it
-        Returns:
-            str: Path of saved video
-        """
-
-        # Set saving switcher flag to true
-        self.saving_switcher.set()
-        filename = f"{timestamp}.mp4"
-        filepath = f"./captures/{filename}"
-        try:
-            # Save buffer video to file
-            fourcc = cv.VideoWriter_fourcc(*'mp4v')
-            writer = cv.VideoWriter(filepath, fourcc, self.framerate, self.resolution)
-            self.logger.info(f"Saving video in buffer.. Dur[{self.VIDEO_DURATION}] Res[{self.resolution}] FR[{self.framerate}] Frames[{video_buffer.occupied_size}]")
-            for frame in video_buffer:
-                writer.write(frame)  # Write frame to video file.
-            # video_buffer.clear()
-            self.logger.success("Video was saved successfully to {}".format(filepath))
-        except Exception as e:
-            self.logger.error(e)
-        finally:
-            writer.release()
-            # Reset flag to continue capturing
-            self.saving_switcher.clear()
-        # Return the video filename
-        return filename
+            try:
+                self.picamera.close()
+                self.recording_signal.clear()
+            except RuntimeError:
+                self.logger.error("Can't close camera.")
 
     @property
     def recording(self):
@@ -134,55 +101,70 @@ class Camera:
     def suspend(self):
         if not self.suspended:
             self.suspending_switcher.set()
-            self.logger.info("Camera suspended.")
 
     def resume(self):
         if self.suspended:
             self.suspending_switcher.clear()
-            self.logger.info("Camera resumed.")
+
+    def save_captured_video(self, video_buffer: VideoBuffer, timestamp: int):
+        """ Saves the captured video recorded in video buffer to local storage
+            then returns the path of it
+        Returns:
+            str: Path of saved video
+        """
+
+        # Set saving switcher flag to true
+        self.saving_switcher.set()
+        filename = f"{timestamp}.mp4"
+        filepath = f"./captures/{filename}"
+        try:
+            # Save buffer video to file
+            fourcc = cv.VideoWriter_fourcc(*'mp4v')
+            writer = cv.VideoWriter(filepath, fourcc, self.framerate, self.resolution)
+            self.logger.info(f"Saving video in buffer.. Dur[{self.VIDEO_DURATION}] Res[{self.resolution}] FR[{self.framerate}] Frames[{video_buffer.occupied_size}]")
+            for frame in video_buffer:
+                writer.write(frame)  # Write frame to video file.
+            video_buffer.clear()
+            self.logger.success("Video was saved successfully to {}".format(filepath))
+        except Exception as e:
+            self.logger.error(e)
+        finally:
+            writer.release()
+            # Reset flag to continue capturing
+            self.saving_switcher.clear()
+        # Return the video filename
+        return filename
 
     def __camera_worker(self):
         self.logger.info("Starting Camera...")
+        # Start the picamera
+        self.picamera.start()
+        self.initialized_signal.set()
         # Allow the camera to wrap up
         sleep(0.1)
-        # Create frame buffer to hold every frame captured
-        try:
-            frame_buffer = PiRGBArray(self.picamera, self.resolution)
-            # Start capturing frames from camera
-            for _ in self.picamera.capture_continuous(frame_buffer, format='bgr', use_video_port=True):
-                # Skip frame if camera is saving video or camera is suspended
-                if self.saving or self.suspended:
-                    continue
-                # Grab the frame then process it
-                image = frame_buffer.array
+        # Start capturing frames from camera
+        while self.recording:
+            # Skip frame if camera is saving video
+            if self.saving or self.suspended:
+                continue
+            self.logger.info("Processing captured frame...")
+            # Grab the frame then process it
+            frame = self.picamera.capture_array(wait=True)
+            # Push frame to video buffer
+            self.video_buffer.push(frame)
 
-                # Push frame to video buffer
-                self.video_buffer.push(image)
-
-                # Clear frame buffer to write next frame
-                frame_buffer.truncate(0)
-                # self.logger.info("Pushed frame to buffer.")
-                # Check whether camera switcher is switched off
-                if not self.recording:
-                    break
-            # Switcher is off now
-            frame_buffer.close()
-            self.picamera.close()
-            self.logger.info("Stopped recording.")
-        except:
-            pass
+        # Poweroff camera and join thread
+        self.picamera.close()
+        self.saving_switcher.clear()
+        self.initialized_signal.clear()
+        self.suspending_switcher.clear()
+        self.capture_after_accident_signal.clear()
+        self.logger.info("Stopped recording.")
 
 
 if __name__ == '__main__':
-    import utils
-    import random
-    if not utils.captures_dir_exists():
-        utils.create_captures_dir()
-    
-    dur = random.uniform(1,11)
-    camera = Camera(duration=dur)
+    camera = Camera(duration=5)
     camera.setup()
     camera.start()
-    sleep(dur)
-    camera.save_captured_video(camera.video_buffer,random.uniform(1,1000000))
+    sleep(5)
     camera.stop()

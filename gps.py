@@ -45,11 +45,11 @@ class GPS:
 
     def __gps_worker_job(self):
         self.logger.info("GPS service started.")
-        while True:
+        while self.switcher.is_set():
             # Open serial port if not opened
             if not self.serial_open:
                 self.open_serial_port()
-                #sleep(1)
+                # sleep(1)
             # Get location updates
             try:
                 line = self.serial.readline().decode().strip()

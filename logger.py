@@ -1,4 +1,4 @@
-
+LOGGING_ENABLED = True
 
 class TextColor:
     RED = '\033[1;31;40m'
@@ -16,20 +16,26 @@ class Logger:
         self.tag = tag
         
     def log(self, msg, text_color = TextColor.WHITE):
-        print(f"{text_color}[{self.tag}]: {msg}{TextColor.WHITE}")
+        if LOGGING_ENABLED:
+            print(f"{text_color}[{self.tag}]: {msg}{TextColor.WHITE}")
 
     
     def success(self, msg):
-        print(f"{TextColor.GREEN}[{self.tag}]: {msg}{TextColor.WHITE}")
+        if LOGGING_ENABLED:
+            print(f"{TextColor.GREEN}[{self.tag}]: {msg}{TextColor.WHITE}")
     
     def error(self, msg):
-        print(f"{TextColor.RED}[{self.tag}]: {msg}{TextColor.WHITE}")
+        if LOGGING_ENABLED:
+            print(f"{TextColor.RED}[{self.tag}]: {msg}{TextColor.WHITE}")
         
     def info(self, msg):
-        print(f"{TextColor.YELLOW}[{self.tag}]: {msg}{TextColor.WHITE}")
+        if LOGGING_ENABLED:
+            print(f"{TextColor.YELLOW}[{self.tag}]: {msg}{TextColor.WHITE}")
         
     def warning(self, msg):
-        print(f"{TextColor.BLUE}[{self.tag}]: {msg}{TextColor.BLUE}")
+        if LOGGING_ENABLED:
+            print(f"{TextColor.BLUE}[{self.tag}]: {msg}{TextColor.BLUE}")
         
     def normal(self, msg):
-        print(f"[{self.tag}]: {msg}")
+        if LOGGING_ENABLED:
+            print(f"[{self.tag}]: {msg}")

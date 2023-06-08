@@ -1,4 +1,3 @@
-import RPi.GPIO as gpio
 from logger import Logger
 from constants import IOPins
 from accident_reporter import CarKeys
@@ -6,6 +5,12 @@ from accident_reporter import CarKeys
 from time import sleep
 from json import dumps as to_json
 from threading import Thread, Event
+from constants import IS_TESTING
+
+if IS_TESTING:
+    from pc_toolkit import gpio
+else:
+    import RPi.GPIO as gpio
 
 
 class CarInfo:
@@ -24,10 +29,10 @@ class CarInfo:
     @staticmethod
     def get_default():
         return CarInfo(
-            id='1223',
-            model='Toyota Supra',
-            owner='Ahmed',
-            emergency='010,011'
+            id='',
+            model='',
+            owner='',
+            emergency=''
         )
 
 
@@ -77,7 +82,10 @@ class CrashDetector:
         while self.detection_signal.wait():
             # Check if crashing button was pressed
             state = gpio.input(IOPins.PIN_CRASHING_BUTTON)
-            #self.logger.info(f"New state: {state} | PrevState: {prev_state}")
+            # HACK: START
+            sleep(5)
+            state = gpio.HIGH
+            # HACK: END
             if prev_state != state:
                 if prev_state == gpio.LOW and state == gpio.HIGH:
                     # Crashhhhhhhhhhhhh ~(@-^-@)~
@@ -182,11 +190,38 @@ class Car:
     def emergency_contacts(self):
         return self.info.mapped.get(CarKeys.EMERGENCY, '')
 
+class InterruptionService:
+
+    class Callback:
+        
+        def on_interrupt(self):
+            pass
+
+    def __init__(self, callback: Callback) -> None:
+        self.switcher = Event()
+        self.callback = callback
+
+        
+    def start(self):
+        if not self.switcher.is_set():
+            self.switcher.set()
+            Thread(name="InterruptionService", target=self.__service_job()).start()
+        
+    def __service_job(self):
+        while self.switcher.is_set():
+            try:
+                sleep(0.05)
+            except KeyboardInterrupt:
+                self.callback.on_interrupt()
+                self.switcher.clear()
+                break
+
 class TestCallback(CrashDetectorCallback):
-    
+
     def on_accident_happened(self):
         sleep(2)
         car.crash_detector.resume()
+
 
 if __name__ == '__main__':
     car = Car(CarInfo.get_default(), TestCallback())

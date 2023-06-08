@@ -1,3 +1,6 @@
+# Testing params
+IS_TESTING = False
+
 # GPS module UART config
 GPS_UART_PORT = '/dev/ttyAMA0'
 GPS_UART_BAUDRATE = 9600

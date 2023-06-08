@@ -1,15 +1,22 @@
 import math
-from time import time as current_time, sleep
+from time import time as current_time
 
 from logger import Logger
-from old_camera import Camera, VideoBuffer
-from gps import GPS
-from car import Car, CarInfo, CrashDetectorCallback
+from camera import Camera, VideoBuffer
 from accident_reporter import AccidentReporter, Accident
-import threading
+from car import Car, CarInfo, CrashDetectorCallback, InterruptionService
+
+from constants import IS_TESTING
+
+if IS_TESTING:
+    # Use emulated GPS
+    from pc_toolkit import GPS
+else:
+    # Use actual GPS module
+    from gps import GPS
 
 
-class AASSL(CrashDetectorCallback):
+class AASSL(CrashDetectorCallback, InterruptionService.Callback):
 
     def __init__(self) -> None:
         self.logger = Logger('AASSL')
@@ -31,6 +38,9 @@ class AASSL(CrashDetectorCallback):
         if self.gps is None:
             self.logger.error("No GPS module was detected.")
 
+        # InterruptionService
+        self.interruption_service = InterruptionService(self)
+
         self.logger.info("System is ready to start...")
 
     def setup_system(self):
@@ -44,6 +54,7 @@ class AASSL(CrashDetectorCallback):
         self.car.start()
         self.gps.start()
         self.camera.start()
+        self.interruption_service.start()
 
     def stop_system(self):
         self.logger.info("Stopping system...")
@@ -55,8 +66,12 @@ class AASSL(CrashDetectorCallback):
         # Exit
         exit(0)
 
+    def on_interrupt(self):
+        self.logger.info("SYSTEM WAS INTERRUPTED.")
+        return self.stop_system()
+
     def on_accident_happened(self):
-        self.logger.info("Received crash signal from CrashDetector. Handling it on thread: {}".format(threading.currentThread().name))
+        self.logger.info("Received crash signal from CrashDetector. Handling it...")
         # Wait until camera is initialized if it not
         if not self.camera.initialized:
             self.logger.info("Waiting for camera to initialize.")
@@ -65,36 +80,39 @@ class AASSL(CrashDetectorCallback):
         # Build accident model
         timestamp = math.floor(current_time() * 1000)  # Timestamp in millis
         # Get before accident video buffer from camera
-        while self.camera.video_buffer.occupied_size < self.camera.video_buffer.max_frame_count:
-            self.logger.info("Filling before accident camera buffer. InBufferNow= {}".format(self.camera.video_buffer.occupied_size))
-            # sleep(0.1)
-        
+        self.camera.wait_until_buffer_filled()
+
         self.camera.suspend()
-        buffer_before_accident = self.camera.video_buffer
+        buffer_before_accident = self.camera.video_buffer.clone()
         self.logger.info("Grabbed before accident video buffer: {}".format(buffer_before_accident))
-        
+
         # Resume the camera
-        # self.camera.video_buffer.clear()
+        self.camera.video_buffer.clear()
         self.logger.info("Capturing 5 secs after accident...")
         # Wait for camera to capture the next 5 secs video
         self.camera.resume()
-        self.camera.video_buffer = VideoBuffer(self.camera.DURATION_FRAMES_COUNT)
-        while self.camera.video_buffer.occupied_size < self.camera.video_buffer.max_frame_count:
-            self.logger.info("Filling after accident camera buffer. InBufferNow= {}".format(self.camera.video_buffer.occupied_size))
-            # sleep(0.1)
-        
+        self.camera.wait_until_buffer_filled()
+
         # Get after accident buffer from camera
-        buffer_after_accident = self.camera.video_buffer
+        buffer_after_accident = self.camera.video_buffer.clone()
         self.logger.info("Grabbed after accident video buffer: {}".format(buffer_after_accident))
 
-        buffer_accident_video = VideoBuffer(
-            buf_before=buffer_before_accident,
-            buf_after= buffer_after_accident
+        buffer_accident_video = self.camera.create_accident_buffer(
+            buffer_before=buffer_before_accident,
+            buffer_after=buffer_after_accident
         )
+        self.camera.video_buffer.clear()
         self.logger.info("Total accident video buffer: {}".format(buffer_accident_video))
         # Save the video
         filename = self.camera.save_captured_video(buffer_accident_video, timestamp)
+        if filename is None:
+            self.logger.error("Camera was unable to save accident video. Aborted reporting.")
+            return
+        
+        # Get last known location from GPS
         location = self.gps.last_known_location
+        
+        # Build accident model
         accident = Accident(
             lat=location[0],
             lng=location[1],
@@ -113,4 +131,3 @@ if __name__ == '__main__':
     aassl = AASSL()
     aassl.setup_system()
     aassl.start_system()
-    # aassl.stop_system()
