@@ -37,7 +37,6 @@ def isempty(s: str):
     if isinstance(s, str):
         return s.strip() == ''
 
-
 def enable_debug_log(enable=False):
     import logging
     logging.basicConfig(level=logging.DEBUG if enable else logging.INFO)

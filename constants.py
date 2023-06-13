@@ -15,7 +15,7 @@ class IOPins:
 class FirebaseConstants:
 
     # FCM
-    TOKEN_REFERENCE = "fcm_token"
+    TOKEN_REFERENCE = "tokens"
 
     # Storage
     STORAGE_BUCKET_URL = "aas-for-sl.appspot.com"

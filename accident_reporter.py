@@ -11,6 +11,7 @@ from constants import FirebaseConstants
 
 from json import dumps as to_json
 
+
 class CarKeys:
     CAR_ID = 'id'
     CAR_MODEL = 'model'
@@ -47,6 +48,7 @@ class Accident:
 
     def as_json(self, car):
         return to_json(self.as_dict(car), indent=2)
+
 
 class AccidentReporter:
 
@@ -130,7 +132,7 @@ class FirebaseStorage:
             return True
         except Exception as e:
             # self.logger.error(e.args[0])
-            self.logger.error(f"Can't upload video to remote storage.")
+            self.logger.error(f"Can't upload video to remote storage. Reason: {e}")
             return False
 
 
@@ -139,27 +141,27 @@ class FirebaseCloudMessaging:
     def __init__(self) -> None:
         self.logger = Logger("FCM")
         # FCM runtime
-        self.token = ""
+        self.tokens = {}
         self.last_eta = ""
 
-    def refresh_token(self):
+    def refresh_tokens(self):
         try:
             self.logger.info("Refreshing token...")
             ref = db.reference(FirebaseConstants.TOKEN_REFERENCE)
 
             # Check if token was refreshed at least once
-            token = ref.get(True)
-            new_token = token[0]
-            new_eta = token[1]
+            rcvd_data = ref.get(True)
+            tokens_map = dict(rcvd_data[0])
+            new_eta = rcvd_data[1]
             # Update token if either eta or token changed
-            if self.last_eta != new_eta or self.token != new_token:
-                self.token = new_token
+            if self.last_eta != new_eta or len(self.tokens) != len(tokens_map):
+                self.tokens = tokens_map
                 self.last_eta = new_eta
-                self.logger.info(f"Token refreshed successfully.")
+                self.logger.info(f"Tokens refreshed successfully. {self.tokens}")
             return True
         except Exception as e:
             # self.logger.error(e.args[0])
-            self.logger.error(f"Can't refresh token.")
+            self.logger.error(f"Can't refresh tokens.")
             return False
 
     def send_notification(self, payload):
@@ -169,24 +171,31 @@ class FirebaseCloudMessaging:
             return False
 
         # Refresh token
-        refreshed = self.refresh_token()
+        refreshed = self.refresh_tokens()
 
-        # Check token after being refreshed
-        if not refreshed or utils.isempty(self.token):
+        # Check tokens after being refreshed
+        if not refreshed or len(self.tokens) == 0:
             return False
 
-        try:
-            # Create the message
-            accident_msg = messaging.Message(
-                data=payload,
-                token=self.token
-            )
-            # Send it
-            response: str = messaging.send(accident_msg)
-            id_idx = response.find(':') + 1
-            self.logger.success(f"Sent message. id= {response[id_idx:]}")
-            return True
-        except Exception as e:
-            self.logger.error(e.args[0])
-            self.logger.error(f"Can't send accident to client app.")
-            return False
+        # Send msg to each token
+        sent_msgs_count = 0
+        for client_uid in self.tokens:
+            target_token = self.tokens.get(client_uid, '')
+            if utils.isempty(target_token):
+                continue
+            try:
+                self.logger.info(f"Sending signal to client '{client_uid}'")
+                # Create the message
+                accident_msg = messaging.Message(
+                    data=payload,
+                    token=target_token
+                )
+                # Send it
+                response: str = messaging.send(accident_msg)
+                id_idx = response.find(':') + 1
+                self.logger.success(f"Notified client '{client_uid}'.")
+                sent_msgs_count += 1
+            except Exception as e:
+                self.logger.warning(f"Couldn't notify client '{client_uid}'. Reason: '{e.args[0]}'")
+
+        return sent_msgs_count > 0
