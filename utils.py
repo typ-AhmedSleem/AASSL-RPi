@@ -3,28 +3,45 @@ from time import sleep
 from os import path, mkdir
 
 CAPTURES_DIR_NAME = 'captures/'
+CONFIG_FILENAME = 'config.csv'
 
 
-def get_captures_dir_path():
+def captures_dir_path():
     return path.join('./', CAPTURES_DIR_NAME)
 
 
+def data_dir_path():
+    return path.join('./', 'data')
+
+
+def config_file_path():
+    return path.join('./data/', CONFIG_FILENAME)
+
+
 def captures_dir_exists():
-    return path.exists(get_captures_dir_path())
+    return path.exists(captures_dir_path())
+
+
+def data_dir_exists():
+    return path.exists(captures_dir_path())
+
+def config_file_exists() -> bool:
+    return path.exists(config_file_path())
 
 
 def create_captures_dir():
     if not captures_dir_exists():
         try:
-            mkdir(get_captures_dir_path())
+            mkdir(captures_dir_path())
         except:
             pass
         finally:
             return True
+    return False
 
 
 def get_capture_file_path(filename: str):
-    return path.join(get_captures_dir_path(), filename)
+    return path.join(captures_dir_path(), filename)
 
 
 def capture_file_exists(filename: str) -> bool:
@@ -37,41 +54,18 @@ def isempty(s: str):
     if isinstance(s, str):
         return s.strip() == ''
 
+
 def enable_debug_log(enable=False):
     import logging
     logging.basicConfig(level=logging.DEBUG if enable else logging.INFO)
 
 
-class gpio:
-
-    IN, OUT = 'in', 'out'
-    BOARD, BCM = 'board', 'bcm'
-    LOW, HIGH = 0, 1
-
-    @staticmethod
-    def setmode(mode):
-        pass
-
-    @staticmethod
-    def setup(pin, mode, pullup):
-        pass
-
-    @staticmethod
-    def cleanup(pin=None, assert_exists=True):
-        pass
-
-    @staticmethod
-    def input(pin) -> int:
-        sleep(1)
-        return random.choice([0, 1])
-
-
 if __name__ == '__main__':
 
-    filename = '123.mp4'    
+    filename = '123.mp4'
     print()
     print()
-    print(get_captures_dir_path())
+    print(captures_dir_path())
     print(get_capture_file_path(filename))
     print()
     print(captures_dir_exists())

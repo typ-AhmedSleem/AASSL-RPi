@@ -2,11 +2,13 @@ import math
 from time import time as current_time
 
 from logger import Logger
-from camera import Camera, VideoBuffer
-from accident_reporter import AccidentReporter, Accident
+from camera import Camera
+from crash_reporter import AccidentReporter, Accident
 from car import Car, CarInfo, CrashDetectorCallback, InterruptionService
 
-from constants import IS_TESTING
+from threading import Event
+
+from constants import IS_TESTING, FirebaseConstants
 
 if IS_TESTING:
     # Use emulated GPS
@@ -20,7 +22,9 @@ class AASSL(CrashDetectorCallback, InterruptionService.Callback):
 
     def __init__(self) -> None:
         self.logger = Logger('AASSL')
-        self.logger.info("Starting AASSL...")
+        self.setup_signal = Event()
+        self.running_signal = Event()
+        self.logger.info("Creating AASSL instance...")
 
         # Car
         self.car = Car(CarInfo.get_default(), self)
@@ -41,30 +45,72 @@ class AASSL(CrashDetectorCallback, InterruptionService.Callback):
         # InterruptionService
         self.interruption_service = InterruptionService(self)
 
-        self.logger.info("System is ready to start...")
+        self.logger.success("Created AASSL instance. Waiting for setup...")
+
+    def system_ready(self):
+        return self.setup_signal.is_set()
+    
+    def system_running(self):
+        return self.running_signal.is_set()
 
     def setup_system(self):
-        self.car.setup()
-        self.gps.setup()
-        self.camera.setup()
-        self.crash_reporter.setup()
+        if self.system_ready():
+            self.logger.warning("System setup already done.")
+            return
+        
+        try:
+            self.car.setup()
+            self.gps.setup()
+            self.camera.setup()
+            self.crash_reporter.setup()
+            
+            self.setup_signal.set()
+        except KeyboardInterrupt:
+            self.logger.error("SETUP WAS INTERRUPTED")
+        except Exception as e:
+            if isinstance(e, FileNotFoundError):
+                self.running_signal.clear()
+                self.logger.error(f"Couldn't find firebase config at path: '{FirebaseConstants.CREDENTIALS_FILE_PATH}'")
+            self.logger.error("One or more system components failed to setup. {}".format(e))
 
     def start_system(self):
-        # Start system components
-        self.car.start()
-        self.gps.start()
-        self.camera.start()
-        self.interruption_service.start()
+        if not self.system_ready():
+            self.logger.warning("System isn't ready yet. Please setup the system first.")
+            return
+        
+        if self.system_running():
+            self.logger.warning("System is already running.")
+            return
+        
+        try:
+            self.running_signal.set()
+            self.logger.info("Starting system...")
+            # Start system components
+            self.car.start()
+            self.gps.start()
+            self.camera.start()
+            self.interruption_service.start()
+        except Exception:
+            self.running_signal.clear()
+            self.logger.error("One or more system components failed to start.")
 
     def stop_system(self):
-        self.logger.info("Stopping system...")
-        # Stop system components
-        self.car.stop()
-        self.gps.stop()
-        self.camera.stop()
-        self.logger.info("System stopped.")
-        # Exit
-        exit(0)
+        if not self.system_running():
+            self.logger.warning("System isn't running to stop it.")
+            return
+        try:
+            self.running_signal.clear()
+            self.logger.info("Stopping system...")
+            # Stop system components
+            self.car.stop()
+            self.gps.stop()
+            self.camera.stop()
+            self.logger.info("System stopped.")
+        except:
+            self.logger.error("One or more system components failed to stop.")
+        finally:
+            # Exit
+            exit(0)
 
     def on_interrupt(self):
         self.logger.info("SYSTEM WAS INTERRUPTED.")
@@ -131,3 +177,4 @@ if __name__ == '__main__':
     aassl = AASSL()
     aassl.setup_system()
     aassl.start_system()
+    # aassl.stop_system()

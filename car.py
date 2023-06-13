@@ -1,11 +1,13 @@
-from logger import Logger
-from constants import IOPins
-from accident_reporter import CarKeys
 
 from time import sleep
 from json import dumps as to_json
 from threading import Thread, Event
-from constants import IS_TESTING
+
+from logger import Logger
+from crash_reporter import CarKeys
+from constants import IS_TESTING, IOPins
+
+from utils import isempty, config_file_path, data_dir_exists, config_file_exists
 
 if IS_TESTING:
     from pc_toolkit import gpio
@@ -82,10 +84,12 @@ class CrashDetector:
         while self.detection_signal.wait():
             # Check if crashing button was pressed
             state = gpio.input(IOPins.PIN_CRASHING_BUTTON)
-            # HACK: START
-            sleep(5)
-            state = gpio.HIGH
-            # HACK: END
+            if IS_TESTING:
+                #HACK START
+                prev_state = gpio.LOW
+                sleep(5)
+                state = gpio.HIGH
+                #HACK END
             if prev_state != state:
                 if prev_state == gpio.LOW and state == gpio.HIGH:
                     # Crashhhhhhhhhhhhh ~(@-^-@)~
@@ -142,26 +146,54 @@ class Car:
         if not self.missing_info:
             return
 
-        self.logger.warning("Info associated with this car isn't complete.")
+        # Retreive info from config
+        self.retreive_info_from_config()
 
-        if len(self.chassis_id) == 0:
-            self.logger.warning("No chassis id was set. Asking user to add it...")
+        # Check for missings
+        if not self.has_chassisid:
+            self.logger.info("No chassis id was set. Asking user to add it...")
             self.info.mapped[CarKeys.CAR_ID] = input('Enter chassis id: ')
+            if not self.has_chassisid:
+                self.logger.error("Car chassis-id can't be empty.")
+                raise ValueError
 
-        if len(self.model) == 0:
-            self.logger.warning("No model was set. Asking user to add it...")
+        if not self.has_model:
+            self.logger.info("No model was set. Asking user to add it...")
             self.info.mapped[CarKeys.CAR_MODEL] = input('Enter car model: ')
+            if not self.has_model:
+                self.logger.error("Car model can't be empty.")
+                raise ValueError
 
-        if len(self.owner) == 0:
-            self.logger.warning("No owner for this car. Asking user to add it...")
+        if not self.has_owner:
+            self.logger.info("No owner for this car. Asking user to add it...")
             self.info.mapped[CarKeys.CAR_OWNER] = input('Enter car owner: ')
+            if not self.has_owner:
+                self.logger.error("Car owner can't be empty.")
+                raise ValueError
 
         if len(self.emergency_contacts) == 0:
-            self.logger.warning("No chassis id was set. Asking user to add it...")
+            self.logger.info("No chassis id was set. Asking user to add it...")
+
             pri_emerg = input('Enter primary emergency contact: ')
+            if isempty(pri_emerg):
+                self.logger.error("Primary contact can't be empty.")
+                raise ValueError
             sec_emerg = input('Enter secondary emergency contact: ')
+            if isempty(sec_emerg):
+                self.logger.warning("Secondary contact you entered is empty but it's optional.")
+
             self.info.mapped[CarKeys.EMERGENCY] = f"{pri_emerg},{sec_emerg}"
 
+        # Save info to config
+        if data_dir_exists():
+            with open(config_file_path(), 'w') as config:
+                config.writelines([
+                    f"{CarKeys.CAR_ID},{self.chassis_id}\n",
+                    f"{CarKeys.CAR_MODEL},{self.model}\n",
+                    f"{CarKeys.CAR_OWNER},{self.owner}\n",
+                    f"{CarKeys.EMERGENCY},{self.emergency_contacts}\n",
+                ])
+                
         self.logger.info(f"CarInfo was set:\n{self.info}")
 
     def start(self):
@@ -170,30 +202,64 @@ class Car:
     def stop(self):
         self.crash_detector.stop()
 
+    def retreive_info_from_config(self):
+        # Retrev info from config (if found)
+        if config_file_exists():
+            self.logger.info("Found config file. Retreving car info...")
+            with open(config_file_path(), 'r') as config:
+                for line in config.readlines():
+                    if isempty(line):
+                        continue
+                    fields = line.split(',')
+                    key = fields[0]
+                    if isempty(key) or (key not in CarKeys.as_list()):
+                        continue
+                    if key == CarKeys.EMERGENCY:
+                        if len(fields[1:]) == 2:
+                            value = f"{fields[1]},{fields[2]}"
+                        else:
+                            value = f"{fields[1].strip()},"
+                    else:
+                        value = fields[1]
+                    self.info.mapped[key] = value.strip()
+
     @property
     def missing_info(self):
-        return len(self.chassis_id) == 0 or len(self.model) == 0 or len(self.owner) == 0 or len(self.emergency_contacts) == 0
+        return not self.has_chassisid or not self.has_model or not self.has_owner or len(self.emergency_contacts) == 0
 
     @property
     def chassis_id(self):
         return self.info.mapped.get(CarKeys.CAR_ID, '')
 
     @property
+    def has_chassisid(self):
+        return not isempty(self.chassis_id)
+
+    @property
     def model(self):
         return self.info.mapped.get(CarKeys.CAR_MODEL, '')
+
+    @property
+    def has_model(self):
+        return not isempty(self.model)
 
     @property
     def owner(self):
         return self.info.mapped.get(CarKeys.CAR_OWNER, '')
 
     @property
+    def has_owner(self):
+        return not isempty(self.owner)
+
+    @property
     def emergency_contacts(self):
         return self.info.mapped.get(CarKeys.EMERGENCY, '')
+
 
 class InterruptionService:
 
     class Callback:
-        
+
         def on_interrupt(self):
             pass
 
@@ -201,12 +267,11 @@ class InterruptionService:
         self.switcher = Event()
         self.callback = callback
 
-        
     def start(self):
         if not self.switcher.is_set():
             self.switcher.set()
             Thread(name="InterruptionService", target=self.__service_job()).start()
-        
+
     def __service_job(self):
         while self.switcher.is_set():
             try:
@@ -215,6 +280,7 @@ class InterruptionService:
                 self.callback.on_interrupt()
                 self.switcher.clear()
                 break
+
 
 class TestCallback(CrashDetectorCallback):
 

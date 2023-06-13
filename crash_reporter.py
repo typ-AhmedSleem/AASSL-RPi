@@ -18,6 +18,15 @@ class CarKeys:
     CAR_OWNER = 'owner'
     EMERGENCY = 'emergency'
 
+    @staticmethod
+    def as_list():
+        return [
+            CarKeys.CAR_ID,
+            CarKeys.CAR_MODEL,
+            CarKeys.CAR_OWNER,
+            CarKeys.EMERGENCY
+        ]
+
 
 class AccidentKeys:
     LATITUDE = 'lat'
@@ -157,7 +166,7 @@ class FirebaseCloudMessaging:
             if self.last_eta != new_eta or len(self.tokens) != len(tokens_map):
                 self.tokens = tokens_map
                 self.last_eta = new_eta
-                self.logger.info(f"Tokens refreshed successfully. {self.tokens}")
+                self.logger.info(f"Tokens refreshed successfully.")
             return True
         except Exception as e:
             # self.logger.error(e.args[0])

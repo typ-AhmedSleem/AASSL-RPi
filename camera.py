@@ -85,8 +85,7 @@ class Camera:
             max_frame_count=self.DURATION_FRAMES_COUNT,
         )
         self.logger.info(f"Created VideoBuffer instance that can hold {self.video_buffer.max_frame_count} frame.")
-        # Log
-        self.logger.success("Created Camera instance. Waiting for setup...")
+        self.logger.info("Created Camera instance. Waiting for setup...")
 
     def setup(self):
         self.picamera = PiCamera()
