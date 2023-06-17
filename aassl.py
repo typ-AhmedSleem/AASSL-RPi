@@ -168,7 +168,11 @@ class AASSL(CrashDetectorCallback, InterruptionService.Callback):
 
         # Report accident
         self.logger.info("Build accident record:\n{}".format(accident.as_json(self.car)))
-        self.crash_reporter.report_accident(accident.as_dict(self.car))
+        reported = self.crash_reporter.report_accident(accident.as_dict(self.car))
+        if reported:
+            self.logger.success("Accident reported successfully.")
+        else:
+            self.logger.error("Couldn't report accident.")
         # Resume car crash detector
         self.car.crash_detector.resume()
 

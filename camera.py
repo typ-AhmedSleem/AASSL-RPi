@@ -1,10 +1,11 @@
+import os
 import math
 import cv2 as cv
 from time import sleep
 from logger import Logger
 from threading import Event, Thread
-import os
 
+import utils
 from constants import IS_TESTING
 
 if IS_TESTING:
@@ -118,6 +119,14 @@ class Camera:
         filename = f"{timestamp}.mp4"
         filepath = f"./captures/{filename}"
         try:
+            # Create captures folder if not exists
+            if not utils.captures_dir_exists():
+                self.logger.warning("Captures folder not exists. Creating it...")
+                created = utils.create_captures_dir()
+                if created:
+                    self.logger.info("Created captures folder.")
+                else:
+                    raise Exception("Can't create captures folder.")
             # Save buffer video to file
             fourcc = cv.VideoWriter_fourcc(*'mp4v')
             writer = cv.VideoWriter(filepath, fourcc, self.framerate, self.resolution)
@@ -216,42 +225,42 @@ class Camera:
             self.logger.error(e)
 
 
-if __name__ == '__main__':
-    import utils
-    import math
-    import random
-    # Create captures folder if not exists
-    if not utils.captures_dir_exists():
-        utils.create_captures_dir()
-    # Setup camera instance
-    camera = Camera(
-        resolution=(1920, 1920),
-        framerate=30,
-        duration=1
-    )
-    camera.setup()
-    camera.start()
+# if __name__ == '__main__':
+#     import utils
+#     import math
+#     import random
+#     # Create captures folder if not exists
+#     if not utils.captures_dir_exists():
+#         utils.create_captures_dir()
+#     # Setup camera instance
+#     camera = Camera(
+#         resolution=(1920, 1920),
+#         framerate=30,
+#         duration=1
+#     )
+#     camera.setup()
+#     camera.start()
 
-    # Get before accident video
-    camera.logger.info("Filling buffer before...")
-    camera.wait_until_buffer_filled()
-    camera.logger.info("Filled buffer before...")
-    camera.suspend()
-    buf_before = camera.video_buffer.clone()
-    camera.video_buffer.clear()
+#     # Get before accident video
+#     camera.logger.info("Filling buffer before...")
+#     camera.wait_until_buffer_filled()
+#     camera.logger.info("Filled buffer before...")
+#     camera.suspend()
+#     buf_before = camera.video_buffer.clone()
+#     camera.video_buffer.clear()
 
-    # Get after accident video
-    camera.resume()
-    camera.logger.info("Filling buffer after...")
-    camera.wait_until_buffer_filled()
-    camera.logger.info("Filled buffer after...")
-    camera.suspend()
-    buf_after = camera.video_buffer.clone()
-    camera.video_buffer.clear()
+#     # Get after accident video
+#     camera.resume()
+#     camera.logger.info("Filling buffer after...")
+#     camera.wait_until_buffer_filled()
+#     camera.logger.info("Filled buffer after...")
+#     camera.suspend()
+#     buf_after = camera.video_buffer.clone()
+#     camera.video_buffer.clear()
 
-    # Get full accident video
-    buf_total = camera.create_accident_buffer(buf_before, buf_after)
+#     # Get full accident video
+#     buf_total = camera.create_accident_buffer(buf_before, buf_after)
 
-    # Save total video then stop camera
-    camera.save_captured_video(buf_total, math.ceil(random.uniform(1, 100)))
-    camera.stop()
+#     # Save total video then stop camera
+#     camera.save_captured_video(buf_total, math.ceil(random.uniform(1, 100)))
+#     camera.stop()

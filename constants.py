@@ -1,5 +1,5 @@
 # Testing params
-IS_TESTING = True
+IS_TESTING = False
 
 # GPS module UART config
 GPS_UART_PORT = '/dev/ttyAMA0'

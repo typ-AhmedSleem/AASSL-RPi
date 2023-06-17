@@ -101,17 +101,13 @@ class AccidentReporter:
         # Upload video to storage
         self.logger.info(f"Preparing to upload file '{filepath}' ...")
         uploaded = self.storage.upload_file(filepath, filename)
+        if not uploaded:
+            return False
 
         # Send push notification to client app
         sent = self.fcm.send_notification(accident_payload)
 
-        reported = uploaded and sent
-        if reported:
-            self.logger.success("Accident reported successfully.")
-        else:
-            self.logger.error("Couldn't report accident.")
-
-        return reported
+        return uploaded and sent
 
 
 class FirebaseStorage:

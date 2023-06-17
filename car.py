@@ -85,11 +85,13 @@ class CrashDetector:
             # Check if crashing button was pressed
             state = gpio.input(IOPins.PIN_CRASHING_BUTTON)
             if IS_TESTING:
-                #HACK START
+                # HACK START
                 prev_state = gpio.LOW
+                self.logger.info("Simulating state LOW.")
                 sleep(5)
                 state = gpio.HIGH
-                #HACK END
+                self.logger.info("Simulating state HIGH.")
+                # HACK END
             if prev_state != state:
                 if prev_state == gpio.LOW and state == gpio.HIGH:
                     # Crashhhhhhhhhhhhh ~(@-^-@)~
@@ -145,56 +147,63 @@ class Car:
         # Check car info
         if not self.missing_info:
             return
+        try:
+            # Retreive info from config
+            self.retreive_info_from_config()
 
-        # Retreive info from config
-        self.retreive_info_from_config()
-
-        # Check for missings
-        if not self.has_chassisid:
-            self.logger.info("No chassis id was set. Asking user to add it...")
-            self.info.mapped[CarKeys.CAR_ID] = input('Enter chassis id: ')
+            # Check for missings
             if not self.has_chassisid:
-                self.logger.error("Car chassis-id can't be empty.")
-                raise ValueError
+                self.logger.info("No chassis id was set. Asking user to add it...")
+                self.info.mapped[CarKeys.CAR_ID] = input('Enter chassis id: ')
+                if not self.has_chassisid:
+                    self.logger.error("Car chassis-id can't be empty.")
+                    raise ValueError
 
-        if not self.has_model:
-            self.logger.info("No model was set. Asking user to add it...")
-            self.info.mapped[CarKeys.CAR_MODEL] = input('Enter car model: ')
             if not self.has_model:
-                self.logger.error("Car model can't be empty.")
-                raise ValueError
+                self.logger.info("No model was set. Asking user to add it...")
+                self.info.mapped[CarKeys.CAR_MODEL] = input('Enter car model: ')
+                if not self.has_model:
+                    self.logger.error("Car model can't be empty.")
+                    raise ValueError
 
-        if not self.has_owner:
-            self.logger.info("No owner for this car. Asking user to add it...")
-            self.info.mapped[CarKeys.CAR_OWNER] = input('Enter car owner: ')
             if not self.has_owner:
-                self.logger.error("Car owner can't be empty.")
-                raise ValueError
+                self.logger.info("No owner for this car. Asking user to add it...")
+                self.info.mapped[CarKeys.CAR_OWNER] = input('Enter car owner: ')
+                if not self.has_owner:
+                    self.logger.error("Car owner can't be empty.")
+                    raise ValueError
 
-        if len(self.emergency_contacts) == 0:
-            self.logger.info("No chassis id was set. Asking user to add it...")
+            if len(self.emergency_contacts) == 0:
+                self.logger.info("No chassis id was set. Asking user to add it...")
 
-            pri_emerg = input('Enter primary emergency contact: ')
-            if isempty(pri_emerg):
-                self.logger.error("Primary contact can't be empty.")
-                raise ValueError
-            sec_emerg = input('Enter secondary emergency contact: ')
-            if isempty(sec_emerg):
-                self.logger.warning("Secondary contact you entered is empty but it's optional.")
+                pri_emerg = input('Enter primary emergency contact: ')
+                if isempty(pri_emerg):
+                    self.logger.error("Primary contact can't be empty.")
+                    raise ValueError
+                sec_emerg = input('Enter secondary emergency contact: ')
+                if isempty(sec_emerg):
+                    self.logger.warning("Secondary contact you entered is empty but it's optional.")
 
-            self.info.mapped[CarKeys.EMERGENCY] = f"{pri_emerg},{sec_emerg}"
+                self.info.mapped[CarKeys.EMERGENCY] = f"{pri_emerg},{sec_emerg}"
 
-        # Save info to config
-        if data_dir_exists():
-            with open(config_file_path(), 'w') as config:
-                config.writelines([
-                    f"{CarKeys.CAR_ID},{self.chassis_id}\n",
-                    f"{CarKeys.CAR_MODEL},{self.model}\n",
-                    f"{CarKeys.CAR_OWNER},{self.owner}\n",
-                    f"{CarKeys.EMERGENCY},{self.emergency_contacts}\n",
-                ])
-                
-        self.logger.info(f"CarInfo was set:\n{self.info}")
+            # Save info to config
+            ddir_exists = data_dir_exists()
+            if ddir_exists:
+                self.logger.info("Data folder exists.")
+                with open(config_file_path(), 'w') as config:
+                    config.writelines([
+                        f"{CarKeys.CAR_ID},{self.chassis_id}\n",
+                        f"{CarKeys.CAR_MODEL},{self.model}\n",
+                        f"{CarKeys.CAR_OWNER},{self.owner}\n",
+                        f"{CarKeys.EMERGENCY},{self.emergency_contacts}\n",
+                    ])
+            else:
+                # self.logger.info("Data folder doesn't exist.")
+                raise Exception("Data folder doesn't exist.")
+
+            self.logger.info(f"CarInfo was set:\n{self.info}")
+        except Exception as e:
+            raise e
 
     def start(self):
         self.crash_detector.start()
