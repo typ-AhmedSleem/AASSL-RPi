@@ -18,6 +18,7 @@ else:
     # Picamera on RPi
     from picamera import PiCamera
     from picamera.array import PiRGBArray
+    from picamera.exc import PiCameraValueError
 
 
 class VideoBuffer:
@@ -51,7 +52,9 @@ class VideoBuffer:
         self.__data.append(frame)
 
     def clear(self):
+        print(f"Buffer clearing. CurrentSize= {self.occupied_size}")
         self.__data.clear()
+        print(f"Buffer cleared. CurrentSize= {self.occupied_size}")
 
     def clone(self):
         return VideoBuffer(
@@ -65,7 +68,7 @@ class VideoBuffer:
 
 class Camera:
 
-    def __init__(self, resolution=(640, 480), framerate=30, vflip=False, duration=5) -> None:
+    def __init__(self, resolution=(640, 480), framerate=15, vflip=False, duration=2) -> None:
         # Camera params
         self.vflip = vflip
         self.framerate = framerate
@@ -171,8 +174,12 @@ class Camera:
         return self.video_buffer.occupied_size < self.video_buffer.max_frame_count
 
     def wait_until_buffer_filled(self):
+        last_size = 0
+        curr_size = self.video_buffer.occupied_size
         while self.filling_buffer:
-            pass
+            if curr_size != last_size:
+                last_size = curr_size
+                self.logger.info(f"Filling buffer. CurrentSize={curr_size}")
 
     def suspend(self):
         if not self.suspended:
@@ -196,71 +203,78 @@ class Camera:
         self.logger.info("Starting Camera...")
         # Wait until camera warms up
         sleep(0.1)
-        # Create frame buffer to hold every frame captured
-        try:
-            self.logger.info("Started recording.")
-            frame_buffer = PiRGBArray(self.picamera, self.resolution)
-            # Start capturing frames from camera
-            for _ in self.picamera.capture_continuous(frame_buffer, format='bgr', use_video_port=True):
-                # Skip frame if camera is saving video or camera is suspended
-                if self.saving or self.suspended:
+        self.logger.info("Started recording.")
+        while self.recording:
+            try:
+                # Create frame buffer to hold every frame captured
+                frame_buffer = PiRGBArray(self.picamera, self.resolution)
+                # Start capturing frames from camera
+                for _ in self.picamera.capture_continuous(frame_buffer, format='bgr', use_video_port=True):
+                    # Skip frame if camera is saving video or camera is suspended
+                    if self.saving or self.suspended:
+                        continue
+                    try:
+                        
+                        # Grab the frame then process it
+                        image = frame_buffer.array
+
+                        # Push frame to video buffer
+                        self.video_buffer.push(image)
+
+                        # Clear frame buffer to write next frame
+                        frame_buffer.truncate(0)
+                    except Exception as e:
+                        self.logger.warning(e)
+
+                    # Check whether camera switcher is switched off
+                    if not self.recording:
+                        self.logger.info("Received stop recording signal.")
+                        break
+                # Switcher is off now
+                frame_buffer.close()
+                self.picamera.close()
+                self.logger.info("Stopped recording.")
+            except Exception as e:
+                if isinstance(e, PiCameraValueError):
                     continue
-                # Grab the frame then process it
-                image = frame_buffer.array
+                self.logger.error(f"Type: {type(e)} | Error: {e}")
+            
+if __name__ == '__main__':
+    import utils
+    import math
+    import random
+    # Create captures folder if not exists
+    if not utils.captures_dir_exists():
+        utils.create_captures_dir()
+    # Setup camera instance
+    camera = Camera(
+        resolution=(1920, 1920),
+        framerate=30,
+        duration=1
+    )
+    camera.setup()
+    camera.start()
 
-                # Push frame to video buffer
-                self.video_buffer.push(image)
+    # Get before accident video
+    camera.logger.info("Filling buffer before...")
+    camera.wait_until_buffer_filled()
+    camera.logger.info("Filled buffer before...")
+    camera.suspend()
+    buf_before = camera.video_buffer.clone()
+    camera.video_buffer.clear()
 
-                # Clear frame buffer to write next frame
-                frame_buffer.truncate(0)
+    # Get after accident video
+    camera.resume()
+    camera.logger.info("Filling buffer after...")
+    camera.wait_until_buffer_filled()
+    camera.logger.info("Filled buffer after...")
+    camera.suspend()
+    buf_after = camera.video_buffer.clone()
+    camera.video_buffer.clear()
 
-                # Check whether camera switcher is switched off
-                if not self.recording:
-                    break
-            # Switcher is off now
-            frame_buffer.close()
-            self.picamera.close()
-            self.logger.info("Stopped recording.")
-        except Exception as e:
-            self.logger.error(e)
+    # Get full accident video
+    buf_total = camera.create_accident_buffer(buf_before, buf_after)
 
-
-# if __name__ == '__main__':
-#     import utils
-#     import math
-#     import random
-#     # Create captures folder if not exists
-#     if not utils.captures_dir_exists():
-#         utils.create_captures_dir()
-#     # Setup camera instance
-#     camera = Camera(
-#         resolution=(1920, 1920),
-#         framerate=30,
-#         duration=1
-#     )
-#     camera.setup()
-#     camera.start()
-
-#     # Get before accident video
-#     camera.logger.info("Filling buffer before...")
-#     camera.wait_until_buffer_filled()
-#     camera.logger.info("Filled buffer before...")
-#     camera.suspend()
-#     buf_before = camera.video_buffer.clone()
-#     camera.video_buffer.clear()
-
-#     # Get after accident video
-#     camera.resume()
-#     camera.logger.info("Filling buffer after...")
-#     camera.wait_until_buffer_filled()
-#     camera.logger.info("Filled buffer after...")
-#     camera.suspend()
-#     buf_after = camera.video_buffer.clone()
-#     camera.video_buffer.clear()
-
-#     # Get full accident video
-#     buf_total = camera.create_accident_buffer(buf_before, buf_after)
-
-#     # Save total video then stop camera
-#     camera.save_captured_video(buf_total, math.ceil(random.uniform(1, 100)))
-#     camera.stop()
+    # Save total video then stop camera
+    camera.save_captured_video(buf_total, math.ceil(random.uniform(1, 100)))
+    camera.stop()

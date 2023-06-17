@@ -125,7 +125,9 @@ class AASSL(CrashDetectorCallback, InterruptionService.Callback):
             self.logger.info("Camera is initialized.")
         # Build accident model
         timestamp = math.floor(current_time() * 1000)  # Timestamp in millis
+        self.camera.resume()
         # Get before accident video buffer from camera
+        self.logger.info("Capturing before accident video...")
         self.camera.wait_until_buffer_filled()
 
         self.camera.suspend()
@@ -174,6 +176,7 @@ class AASSL(CrashDetectorCallback, InterruptionService.Callback):
         else:
             self.logger.error("Couldn't report accident.")
         # Resume car crash detector
+        self.camera.resume()
         self.car.crash_detector.resume()
 
 
