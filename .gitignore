@@ -6,3 +6,6 @@ captures
 *.mp4
 aas-for-sl-firebase-adminsdk-dznrq-b0280663c2.json
 *.csv
+
+# Secrets
+data
